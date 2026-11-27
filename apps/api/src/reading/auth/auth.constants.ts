@@ -1,0 +1,1 @@
+export const SUPABASE_JWT_VERIFIER = Symbol('SUPABASE_JWT_VERIFIER');

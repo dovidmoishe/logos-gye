@@ -1,0 +1,78 @@
+name: logos-email-test
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: logos
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+      POSTGRES_DB: logos
+    volumes:
+      - data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-auth.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logos -d logos"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  mail:
+    image: axllent/mailpit:v1.34.0
+    ports:
+      - "127.0.0.1:54324:8025"
+  auth:
+    image: supabase/gotrue:v2.199.0
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      API_EXTERNAL_URL: ${PHONE_ORIGIN}/auth/v1
+      GOTRUE_SITE_URL: ${PHONE_ORIGIN}
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://logos:${DB_PASSWORD}@db:5432/email_auth
+      DB_NAMESPACE: auth
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?}
+      GOTRUE_JWT_KEYS: ${JWT_KEYS:?}
+      GOTRUE_JWT_ISSUER: ${PHONE_ORIGIN}/auth/v1
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_SMTP_HOST: mail
+      GOTRUE_SMTP_PORT: 1025
+      GOTRUE_SMTP_ADMIN_EMAIL: accounts@logos.test
+      GOTRUE_SMTP_SENDER_NAME: Logos
+      GOTRUE_MAILER_SUBJECTS_MAGIC_LINK: Your Logos sign-in code
+      GOTRUE_MAILER_SUBJECTS_CONFIRMATION: Your Logos sign-in code
+      GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: http://gateway:8080/email-code.html
+      GOTRUE_MAILER_TEMPLATES_CONFIRMATION: http://gateway:8080/email-code.html
+  api:
+    build:
+      context: ../../..
+      dockerfile: infra/Dockerfile
+      target: api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://logos:${DB_PASSWORD}@db:5432/logos
+      SUPABASE_URL: http://gateway:8080
+      SUPABASE_JWT_ISSUER: ${PHONE_ORIGIN}/auth/v1
+  gateway:
+    image: nginx:stable-alpine
+    depends_on:
+      api:
+        condition: service_started
+        restart: true
+      auth:
+        condition: service_started
+        restart: true
+    ports:
+      - "127.0.0.1:54321:8080"
+      - "54443:8443"
+    volumes:
+      - ./gateway.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../email-code.html:/usr/share/nginx/html/email-code.html:ro
+      - ../../../.data/local-auth/tls:/etc/nginx/logos:ro
+volumes:
+  data:

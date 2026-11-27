@@ -1,0 +1,39 @@
+{
+  "name": "@logos/api",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc-watch --onSuccess \"node dist/main.js\"",
+    "start": "node dist/main.js",
+    "test": "npm run build && node --test test/*.test.cjs",
+    "db:generate": "drizzle-kit generate",
+    "db:import-sqlite": "npm run build && node scripts/import-sqlite.cjs",
+    "seed:scripture": "npm run build && node dist/reading/jobs/seed-bible.js && node dist/reading/jobs/seed-topics.js && node dist/reading/jobs/seed-topic-links.js",
+    "score:verse-topics": "node dist/reading/jobs/generate-verse-topic-scores.js",
+    "embed:topics": "node dist/reading/jobs/generate-topic-embeddings.js",
+    "embed:verses": "node dist/reading/jobs/generate-verse-embeddings.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11",
+    "@nestjs/core": "^11",
+    "@nestjs/platform-express": "^11",
+    "cookie-parser": "^1",
+    "drizzle-orm": "^0.45.4",
+    "express": "^5",
+    "express-rate-limit": "^8.7.5",
+    "jose": "^6.2.18",
+    "openai": "^7.65.0",
+    "pg": "^8.23.1",
+    "reflect-metadata": "^0.2",
+    "rxjs": "^7"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1",
+    "@types/express": "^5",
+    "@types/node": "^22",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "tsc-watch": "^7",
+    "typescript": "~5.9.3"
+  }
+}

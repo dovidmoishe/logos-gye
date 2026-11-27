@@ -1,0 +1,21 @@
+import { UserEventType } from './recommendation.types';
+
+export const ESTIMATED_READING_SPEED_WPM = 225;
+export const DWELL_CAP_MS = 60_000;
+export const ONBOARDING_INITIAL_AFFINITY = 0.6;
+
+export const INTERACTION_WEIGHTS: Record<UserEventType, number> = {
+  SCRIPTURE_FINDER_QUERY: 0,
+  SCRIPTURE_FINDER_RESULT_OPEN: 2,
+  SEARCH: 0,
+  SEARCH_RESULT_OPEN: 2,
+  VERSE_IMPRESSION: 0,
+  VERSE_LIKE: 3,
+  VERSE_READ: 0,
+  VERSE_REVISIT: 3,
+  VERSE_SAVE: 5,
+  VERSE_SHARE: 6,
+  VERSE_SKIP: -1,
+  VERSE_UNLIKE: -3,
+  VERSE_UNSAVE: -5,
+};

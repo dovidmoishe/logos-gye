@@ -1,0 +1,32 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: logos
+          POSTGRES_PASSWORD: logos_local
+          POSTGRES_DB: logos_gye
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U logos -d logos_gye"
+          --health-interval 3s --health-timeout 3s --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcodebuild -project apps/ios/Logos.xcodeproj -scheme Logos -destination 'generic/platform=iOS Simulator' build
+      - run: swiftc apps/ios/Pilot/ResolverProbe.swift apps/ios/Validation/main.swift -o /tmp/check && /tmp/check

@@ -1,8 +1,8 @@
-# Logos Gye — Product Requirements Document
+# Logos — Product Requirements Document
 
 Status: Draft for product planning; implementation has not started.
 Date: 25 November 2026
-Working project name: logos-gye
+Working project name: Logos
 Platforms: Web application, iOS application, Android application
 
 ## 1. Product vision
@@ -181,7 +181,7 @@ Proposed pilot targets, to confirm after feasibility: at least 90% guided onboar
 - Verified warning-page implementation and certificate approach, if any.
 - Exact retention and processing locations supported by the chosen provider.
 - Weekly-only versus optional immediate alerts, and how to handle false positives.
-- Visual identity, pronunciation and meaning of Logos Gye, domain availability, and name clearance.
+- Visual identity, pronunciation and meaning of Logos, domain availability, and name clearance.
 - Initial price, support commitment, and pilot size after costs are known.
 
 ## 14. Reference material

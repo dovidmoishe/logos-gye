@@ -1,0 +1,4 @@
+// Generated for on-device development by infra/dev-reader-mac.sh.
+#include? "../../.data/reader.xcconfig"
+// Optional local Supabase Auth and Mailpit setup.
+#include? "../../.data/local-auth/Debug.xcconfig"
