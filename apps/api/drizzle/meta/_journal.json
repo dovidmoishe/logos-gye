@@ -43,6 +43,13 @@
       "when": 1795824242909,
       "tag": "0005_weekly_partner_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795825502337,
+      "tag": "0006_report_sources_and_mail",
+      "breakpoints": true
     }
   ]
 }

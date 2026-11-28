@@ -113,3 +113,21 @@ export const weeklyReports = pgTable(
     check("nonnegative_grouped_requests", sql`${r.groupedRequests} >= 0`),
   ],
 );
+
+// The pilot reports one explicitly mapped, paired iPhone per agreement.
+export const reportingSources = pgTable("agreement_reporting_sources", {
+  agreementId: text("agreement_id").primaryKey().references(() => agreements.id, { onDelete: "cascade" }),
+  deviceId: text("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+  registeredAt: bigint("registered_at", { mode: "number" }).notNull(),
+  gatewayAccount: text("gateway_account").notNull(),
+  registration: text("registration").notNull(),
+  adultPolicy: text("adult_policy").notNull(),
+});
+
+export const partnerMail = pgTable("partner_mail", {
+  agreementId: text("agreement_id").notNull().references(() => agreements.id, { onDelete: "cascade" }),
+  // Zero denotes the invitation. A report uses its UTC week start.
+  period: bigint("period", { mode: "number" }).notNull(),
+  nextAttempt: bigint("next_attempt", { mode: "number" }).notNull(),
+  attempts: integer("attempts").notNull().default(0),
+}, (row) => [primaryKey({ columns: [row.agreementId, row.period] }), index("partner_mail_due").on(row.nextAttempt)]);

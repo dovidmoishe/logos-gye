@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   ConflictException,
+  HttpException,
   Controller,
   Get,
   Injectable,
@@ -17,7 +18,16 @@ import type { Request } from "express";
 import { randomUUID } from "node:crypto";
 import { AccountService } from "./accounts";
 import { Database } from "./db/connection";
-import { accounts, agreements, weeklyReports } from "./db/schema";
+import {
+  accounts,
+  agreements,
+  partnerMail,
+  reportingSources,
+  weeklyReports,
+} from "./db/schema";
+
+import { isMailbox } from "./reporting/mail";
+import { day, week, monday, reportScope as scope } from "./reporting/week";
 
 type Party = { id: string; username: string };
 function addressedTo(party: Party) {
@@ -30,7 +40,6 @@ function addressedTo(party: Party) {
     ),
   );
 }
-const scope = "weekly-blocked-counts-v1";
 @Injectable()
 export class Agreements {
   constructor(private readonly database: Database) {}
@@ -81,38 +90,58 @@ export class Agreements {
       .select({ id: accounts.id })
       .from(accounts)
       .where(eq(accounts.username, address));
-    if (!recipient && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))
+    if (!recipient && !isMailbox(address))
       throw new NotFoundException("Partner account unavailable.");
     if (recipient?.id === user.id)
       throw new BadRequestException("Choose another account.");
     await this.expire(user);
     const now = Date.now();
-    const created = await this.db
-      .insert(agreements)
-      .values({
-        id: randomUUID(),
-        owner: user.id,
-        recipient: recipient?.id ?? null,
-        inviteAddress: address,
-        status: "Pending",
-        scope,
-        createdAt: now,
-        expiresAt: now + 7 * 86400000,
-      })
-      .onConflictDoNothing()
-      .returning({ id: agreements.id });
-    if (!created.length)
-      throw new ConflictException(
-        "An active invitation or connection already exists.",
-      );
+    await this.db.transaction(async (tx) => {
+      // Serialize the per-sender invitation budget across API instances.
+      await tx
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(eq(accounts.id, user.id))
+        .for("update");
+      const [recent] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(agreements)
+        .where(
+          and(
+            eq(agreements.owner, user.id),
+            gt(agreements.createdAt, now - 3600000),
+          ),
+        );
+      if (recent.count >= 20)
+        throw new HttpException("Try inviting more partners later.", 429);
+      const [created] = await tx
+        .insert(agreements)
+        .values({
+          id: randomUUID(),
+          owner: user.id,
+          recipient: recipient?.id ?? null,
+          inviteAddress: address,
+          status: "Pending",
+          scope,
+          createdAt: now,
+          expiresAt: now + week,
+        })
+        .onConflictDoNothing()
+        .returning({ id: agreements.id });
+      if (!created)
+        throw new ConflictException(
+          "An active invitation or connection already exists.",
+        );
+      if (isMailbox(address)) {
+        await tx
+          .insert(partnerMail)
+          .values({ agreementId: created.id, period: 0, nextAttempt: now });
+      }
+    });
     return this.list(user);
   }
   async weeklyReport(user: Party, id: string) {
-    const day = 86400000;
-    const week = day * 7;
-    // Monday 00:00 UTC. Only a completed week entirely inside this agreement is eligible.
-    const currentMonday =
-      Math.floor((Date.now() - 4 * day) / week) * week + 4 * day;
+    const currentMonday = monday(Date.now());
     const weekStart = currentMonday - week;
     const [row] = await this.db
       .select({
@@ -183,29 +212,38 @@ export class Agreements {
             eq(agreements.status, "Pending"),
             gt(agreements.expiresAt, Date.now()),
           );
-    const changed = await this.db
-      .update(agreements)
-      .set({
-        ...(action === "revoke" ? {} : { recipient: user.id }),
-        ...(action === "accept" ? { acceptedAt: Date.now() } : {}),
-        status:
-          action === "accept"
-            ? "Connected"
-            : action === "decline"
-              ? "Declined"
-              : "Revoked",
-      })
-      .where(
-        and(
-          eq(agreements.id, id),
-          eq(agreements.scope, scope),
-          permitted,
-          eligible,
-        ),
-      )
-      .returning({ id: agreements.id });
-    if (!changed.length)
-      throw new NotFoundException("Agreement unavailable for this action.");
+    await this.db.transaction(async (tx) => {
+      const changed = await tx
+        .update(agreements)
+        .set({
+          ...(action === "revoke" ? {} : { recipient: user.id }),
+          ...(action === "accept" ? { acceptedAt: Date.now() } : {}),
+          status:
+            action === "accept"
+              ? "Connected"
+              : action === "decline"
+                ? "Declined"
+                : "Revoked",
+        })
+        .where(
+          and(
+            eq(agreements.id, id),
+            eq(agreements.scope, scope),
+            permitted,
+            eligible,
+          ),
+        )
+        .returning({ id: agreements.id });
+      if (!changed.length)
+        throw new NotFoundException("Agreement unavailable for this action.");
+      await tx.delete(partnerMail).where(eq(partnerMail.agreementId, id));
+      if (action === "revoke") {
+        await tx
+          .delete(reportingSources)
+          .where(eq(reportingSources.agreementId, id));
+        await tx.delete(weeklyReports).where(eq(weeklyReports.agreementId, id));
+      }
+    });
     return this.list(user);
   }
 }

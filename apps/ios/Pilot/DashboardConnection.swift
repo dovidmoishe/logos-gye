@@ -192,7 +192,8 @@ struct PartnerInformation: View {
                         .textInputAutocapitalization(.never).keyboardType(.emailAddress).autocorrectionDisabled()
                         .focused($editingRecipient).submitLabel(.done).onSubmit { editingRecipient = false }
                         .onChange(of: recipient) { _, _ in consent = false }
-                    Toggle("I agree to share weekly grouped counts with this partner.", isOn: $consent)
+                    Toggle("Share weekly counts from my iPhone", isOn: $consent)
+                        .accessibilityIdentifier("partnerConsent")
                         .onChange(of: consent) { _, approved in if approved { editingRecipient = false } }
                     Button("Create invitation") {
                         Task {
@@ -203,6 +204,9 @@ struct PartnerInformation: View {
                         }
                     }.disabled(!consent || recipient.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     Button("Cancel") { adding = false; recipient = ""; consent = false }
+                    DisclosureGroup("How reporting works") {
+                        Text("On a separately enrolled iPhone, Cloudflare Gateway logs blocked requests. Logos groups retries by domain and keeps the weekly total for 30 days. Either person can end sharing and remove the stored totals.")
+                    }
                 }.disabled(busy)
             }
             if let dashboard { Link("Open dashboard", destination: dashboard) }
@@ -218,7 +222,7 @@ struct PartnerInformation: View {
                         }
                     }.screenTitle("Report preview")
                 }
-            } footer: { Text("The pilot sends no partner reports.") }
+            } footer: { Text("Email invitations and report notices lead to Partners. Counts are visible after sign-in.") }
         }
         .screenTitle("Accountability partner")
         .onAppear { dashboard = (try? DeviceKeychain.load())?.origin.appendingPathComponent("partners") }
@@ -280,7 +284,11 @@ private struct PartnerWeekView: View {
                          + Date(timeIntervalSince1970: report.weekEnd / 1000 - 1).formatted(utc))
                     switch report.status {
                     case .available:
-                        if let count = report.groupedRequests { LabeledContent("Grouped blocked requests", value: String(count)) }
+                        if let count = report.groupedRequests { LabeledContent("Grouped blocked requests", value: String(count))
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Grouped blocked requests")
+                            .accessibilityValue(String(count))
+                            .accessibilityIdentifier("weeklyRequestCount") }
                     case .unavailable: Text("No report data is available for this week.")
                     case .awaitingFirstWeek: Text("This is the first full week covered by your agreement.")
                     }

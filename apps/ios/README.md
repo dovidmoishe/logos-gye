@@ -1,6 +1,6 @@
 # Logos for iPhone
 
-Open Logos.xcodeproj and run the Logos scheme. The deployment target is iOS 17. The simulator offers resolver diagnostics. Installation and removal use Apple's DNS Settings capability on an iPhone. Protection uses Cloudflare for Families, a shared public resolver with adult and malware filtering. Optional device accounts support manual safe-check sync. Custom policies and partner deliveries remain pending.
+Open Logos.xcodeproj and run the Logos scheme. The deployment target is iOS 17. The simulator offers resolver diagnostics. Installation and removal use Apple's DNS Settings capability on an iPhone. Protection uses Cloudflare for Families, a shared public resolver with adult and malware filtering. Optional device accounts support manual safe-check sync. Local partner emails go to Mailpit. Weekly activity requires a separately enrolled Gateway reporting source and a complete week of coverage.
 
 ## Using the pilot
 

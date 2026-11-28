@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { readFileSync } from "node:fs";
 import type { NestApplicationOptions } from "@nestjs/common";
+import { PartnerReportWorker } from "./reporting/mail";
 import { Agreements, AgreementsController } from "./agreements";
 import {
   Body,
@@ -73,7 +74,7 @@ class PartnerController {
     DeviceController,
     AgreementsController,
   ],
-  providers: [Database, Partners, AccountService, Agreements, FeedService, OnboardingService,
+  providers: [Database, PartnerReportWorker, Partners, AccountService, Agreements, FeedService, OnboardingService,
     InteractionsService, UsersService, ScoringService, AffinityService, AuthGuard, AuthService,
     { provide: DATABASE, inject: [Database], useFactory: (database: Database) => database.db },
     { provide: SUPABASE_JWT_VERIFIER, useClass: SupabaseJwtVerifier }

@@ -69,11 +69,11 @@ export function ReportPreview() {
         <strong>—</strong>
       </div>
       <small>
-        Event data is unavailable in the pilot. A DNS request can come from
+        The pilot measures one enrolled iPhone for a full week. Requests can come from
         background activity.
       </small>
       <div className="scope-note">
-        Domain names, coverage gaps, reading history and check-ins stay private.
+        Your partner sees only the weekly count. Domain names, coverage gaps, reading history and check-ins are excluded.
       </div>
     </section>
   );
@@ -336,15 +336,21 @@ export function AccountAgreements({ username }: { username: string }) {
               </label>
               <small>
                 The invitation appears in their Logos account for seven days.
-                Let them know where to find it.
+                Email invitations link to Partners. Counts are visible after sign-in.
               </small>
+              <details>
+                <summary>How reporting works</summary>
+                <small>On a separately enrolled iPhone, Cloudflare Gateway logs blocked requests.
+                  Logos groups retries by domain and keeps the weekly total for 30 days.
+                  Either person can end sharing and remove the stored totals.</small>
+              </details>
               <label className="consent">
                 <input
                   type="checkbox"
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
                 />
-                I agree to share weekly grouped counts with this partner once
+                I agree to share weekly grouped counts from my reporting iPhone once
                 they accept.
               </label>
               <button

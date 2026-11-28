@@ -1,6 +1,20 @@
 import XCTest
 
 final class PilotUITests: XCTestCase {
+    func testSelectedDNSBlocksHarmlessFixtureOnPhone() throws {
+        guard ProcessInfo.processInfo.environment["LOGOS_TEST_SELECTED_DNS"] == "1" else {
+            throw XCTSkip("Requires an iPhone with filtering selected.")
+        }
+        let app = XCUIApplication()
+        app.launch()
+        enterHomeIfNeeded(app)
+        app.tabBars.buttons["Protection"].tap()
+        app.buttons["Run safe DNS check"].tap()
+        let blocked = app.staticTexts["currentDNSCheck"].firstMatch
+        XCTAssertTrue(blocked.waitForExistence(timeout: 20))
+        XCTAssertTrue(blocked.label.contains("The safe category test was blocked and the control domain resolved."))
+    }
+
     func testShareSafeCheckWithDashboard() throws {
         guard let pass = ProcessInfo.processInfo.environment["LOGOS_PAIRING_PASS"] else {
             throw XCTSkip("Set TEST_RUNNER_LOGOS_PAIRING_PASS to a one-use simulator pairing pass.")
@@ -50,6 +64,45 @@ final class PilotUITests: XCTestCase {
         app.buttons.containing(NSPredicate(format: "label CONTAINS 'Continue reading'")).firstMatch.tap()
         XCTAssertTrue(app.staticTexts[reference].waitForExistence(timeout: 12))
         XCTAssertTrue(app.staticTexts[reference].isHittable)
+    }
+
+    func testOpenMeasuredPartnerWeek() throws {
+        #if targetEnvironment(simulator)
+        let environment = ProcessInfo.processInfo.environment
+        guard let email = environment["LOGOS_TEST_WEEK_PARTNER"], email.hasSuffix("@example.test"),
+              let owner = environment["LOGOS_TEST_WEEK_OWNER"], let expected = environment["LOGOS_TEST_WEEK_COUNT"] else {
+            throw XCTSkip("Requires a local Mailpit partner account with a measured fixture week.")
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-homeIntroductionComplete", "YES", "-reader.live", "YES"]
+        app.launch()
+        enterHomeIfNeeded(app)
+        app.tabBars.buttons["Protection"].tap()
+        app.buttons["Accountability partner"].tap()
+        let signIn = app.buttons["Sign in to manage partners"]
+        if signIn.waitForExistence(timeout: 2) {
+            signIn.tap()
+            app.textFields["Email"].tap()
+            app.textFields["Email"].typeText(email)
+            app.buttons["Send code"].coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).tap()
+            let code = app.textFields["Email code"]
+            XCTAssertTrue(code.waitForExistence(timeout: 8))
+            code.tap()
+            code.typeText(try readLocalEmailCode(sentTo: email))
+            app.buttons["Verify code"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(app.staticTexts[owner].waitForExistence(timeout: 12))
+        app.buttons["View weekly report"].firstMatch.tap()
+        let count = app.descendants(matching: .any).matching(identifier: "weeklyRequestCount").firstMatch
+        XCTAssertTrue(count.waitForExistence(timeout: 8))
+        XCTAssertEqual(count.value as? String, expected)
+        app.tabBars.buttons["Read"].tap()
+        app.buttons["Reader options"].tap()
+        app.buttons[email].tap()
+        app.buttons["Sign out"].tap()
+        #else
+        throw XCTSkip("Local Mailpit fixture runs on the simulator.")
+        #endif
     }
 
     func testPersonalizedReaderWithTestAccount() throws {
@@ -145,9 +198,11 @@ final class PilotUITests: XCTestCase {
             let partner = "partner-" + UUID().uuidString.prefix(8).lowercased() + "@example.test"
             let field = app.textFields["Partner email or pilot username"]
             field.tap()
-            field.typeText(partner)
-            let approval = app.switches.firstMatch
-            approval.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.5)).tap()
+            field.typeText(partner + "\n")
+            let approval = app.switches["partnerConsent"]
+            if !approval.isHittable { app.swipeUp() }
+            approval.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            XCTAssertEqual(approval.value as? String, "1")
             let create = app.buttons["Create invitation"]
             if !create.isHittable { app.swipeUp() }
             XCTAssertTrue(create.isEnabled)

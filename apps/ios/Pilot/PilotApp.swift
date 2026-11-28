@@ -30,6 +30,7 @@ struct ProtectionView: View {
     @State private var known = false
     @State private var busy = false
     @AppStorage("lastDNSCheck") private var result = ""
+    @State private var checkedThisSession = false
     @State private var confirmRemoval = false
     private let manager = NEDNSSettingsManager.shared()
 
@@ -64,7 +65,7 @@ struct ProtectionView: View {
                     #endif
                 }
                 if !result.isEmpty {
-                    Section("Last connection check") { Text(result) }
+                    Section("Last connection check") { Text(result).accessibilityIdentifier(checkedThisSession ? "currentDNSCheck" : "savedDNSCheck") }
                 }
                 Section("Accountability") {
                     NavigationLink("Dashboard connection") { DashboardConnection() }
@@ -101,8 +102,10 @@ struct ProtectionView: View {
         Button("Run safe DNS check") {
             busy = true
             Task {
+                checkedThisSession = false
                 let outcome = await Task.detached { ResolverProbe.run() }.value
                 result = Date.now.formatted(date: .abbreviated, time: .shortened) + " · " + outcome.rawValue
+                checkedThisSession = true
                 busy = false
             }
         }

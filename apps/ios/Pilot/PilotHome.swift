@@ -206,7 +206,7 @@ private struct WelcomeFlow: View {
     private let details = [
         "Block adult sites. Take a daily pause.",
         "What kind of encouragement would you like?",
-        "When the filter is on, Cloudflare for Families receives DNS requests. Check-ins stay on this phone. No activity is sent to partners."
+        "When the filter is on, Cloudflare for Families receives DNS requests. Check-ins stay on this phone. Partner reports require your agreement."
     ]
 
     var body: some View {

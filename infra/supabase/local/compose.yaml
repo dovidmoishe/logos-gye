@@ -56,8 +56,14 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://logos:${DB_PASSWORD}@db:5432/logos
+      PARTNER_EXPORT_DIR: /report-exports
+      PARTNER_SMTP_URL: smtp://mail:1025
+      PARTNER_MAIL_FROM: partners@logos.test
+      PARTNER_DASHBOARD_ORIGIN: ${PHONE_ORIGIN}
       SUPABASE_URL: http://gateway:8080
       SUPABASE_JWT_ISSUER: ${PHONE_ORIGIN}/auth/v1
+    volumes:
+      - ../../../.data/report-exports:/report-exports:ro
   web:
     build:
       context: ../../..

@@ -72,7 +72,26 @@ test("verified Logos identities own their ranked feeds, topics, bookmarks and da
   const missing = await (await call(path+"/report",tokens[0])).json();
   assert.equal(missing.status,"unavailable");
   assert.equal(missing.groupedRequests,null);
-  await db.query("insert into agreement_weekly_reports (agreement_id,week_start,grouped_requests) values($1,$2,0)",[pending.id,missing.weekStart]);
+  // A measured zero requires all seven days, even if no eligible DNS requests arrived.
+  const { importWeek, bindSource } = require("../dist/reporting/gateway");
+  const { mkdtemp, writeFile, rm } = require("node:fs/promises");
+  const { join } = require("node:path");
+  const { tmpdir } = require("node:os");
+  const directory = await mkdtemp(join(tmpdir(), "logos-zero-"));
+  t.after(() => rm(directory,{recursive:true,force:true}));
+  const enrollment = await (await call("account/devices",tokens[0],{name:"Zero report fixture"})).json();
+  assert.equal((await call("device/pair",undefined,{code:enrollment.code})).status,201);
+  const source = {account:"b".repeat(32),registration:randomUUID(),policy:randomUUID()};
+  await bindSource(app.get(Database),pending.id,enrollment.id,source);
+  await db.query("update agreement_reporting_sources set registered_at=$2 where agreement_id=$1",[pending.id,missing.weekStart]);
+  const days = [];
+  for (let i=0; i<7; i++) {
+    const start = new Date(missing.weekStart + i*86400000).toISOString();
+    await writeFile(join(directory,start.slice(0,10)+".ndjson"),"");
+    days.push({start,rows:0,completeCoverage:true,sha256:require("node:crypto").createHash("sha256").digest("hex")});
+  }
+  await writeFile(join(directory,"manifest.json"),JSON.stringify({...source,weekStart:days[0].start,days}));
+  assert.equal(await importWeek(app.get(Database),pending.id,directory),0);
   const report = await (await call(path+"/report",tokens[1])).json();
   assert.deepEqual(report,{...missing,status:"available",groupedRequests:0});
   assert.equal((await patch(tokens[0], "revoke")).status,200);
