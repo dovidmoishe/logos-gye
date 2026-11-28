@@ -23,4 +23,4 @@ Install the supplied systemd service and timer. Daily dumps go to /var/backups/l
 
 ## Mail
 
-Configure PARTNER_MAIL_FROM=dave@withlogos.app after verifying the domain. For Senviok, use mail.senviok.live on 587 or 2525, user api, the provider API key as the password, and STARTTLS. Set PARTNER_SMTP_URL in the root-only .env with a percent-encoded password and requireTLS=true. Recreate the API to pick up settings. Configure the same verified sender separately in hosted Supabase Auth for OTP delivery. While SMTP is unset, the API leaves mail queued and skips delivery.
+Set PARTNER_MAIL_FROM to the verified sender and SENVIOK_API_KEY in the root-only .env for HTTPS delivery. Recreate the API after a credential change. The worker shares the same queue and consent checks across HTTPS and SMTP. Deployments using SMTP can supply PARTNER_SMTP_URL instead. With neither credential configured, mail stays queued. Configure hosted Supabase OTP delivery separately.

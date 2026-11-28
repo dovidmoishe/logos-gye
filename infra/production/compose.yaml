@@ -30,6 +30,7 @@ services:
       ADGUARD_PUBLIC_ORIGIN: https://dns.withlogos.app
       ADGUARD_INTERNAL_ORIGIN: http://adguard:3000
       PARTNER_DASHBOARD_ORIGIN: https://app.withlogos.app
+      SENVIOK_API_KEY: ${SENVIOK_API_KEY:-}
       PARTNER_SMTP_URL: ${PARTNER_SMTP_URL:-}
       PARTNER_MAIL_FROM: ${PARTNER_MAIL_FROM:-}
     healthcheck:

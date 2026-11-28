@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { access } from "node:fs/promises";
 import { alertCooldown } from "./live";
 import { importWeek } from "./gateway";
-import nodemailer from "nodemailer";
+import { partnerEmailTransport } from "./partner-email";
 import { Database } from "../db/connection";
 import { day, monday, reportScope, week } from "./week";
 
@@ -26,26 +26,22 @@ export class PartnerReportWorker
   constructor(private readonly database: Database) {}
   private timer?: NodeJS.Timeout;
   private running?: Promise<void>;
-  private transport?: ReturnType<typeof nodemailer.createTransport>;
+  private transport?: ReturnType<typeof partnerEmailTransport>;
   private link = "";
   private nextCleanup = 0;
   private nextImport = 0;
 
   onApplicationBootstrap() {
-    if (process.env.PARTNER_SMTP_URL) {
+    if (process.env.PARTNER_SMTP_URL || process.env.SENVIOK_API_KEY) {
       this.link = new URL(
         "/partners",
         process.env.PARTNER_DASHBOARD_ORIGIN,
       ).href;
       if (!isMailbox(process.env.PARTNER_MAIL_FROM ?? ""))
         throw new Error("Configure PARTNER_MAIL_FROM");
-      const smtp = new URL(process.env.PARTNER_SMTP_URL);
-      if (!["smtp:", "smtps:"].includes(smtp.protocol))
-        throw new Error("Configure an SMTP transport");
-      smtp.searchParams.set("connectionTimeout", "10000");
-      smtp.searchParams.set("greetingTimeout", "10000");
-      smtp.searchParams.set("socketTimeout", "15000");
-      this.transport = nodemailer.createTransport(smtp.href);
+      this.transport = partnerEmailTransport(
+        process.env.PARTNER_MAIL_FROM!, process.env.SENVIOK_API_KEY, process.env.PARTNER_SMTP_URL,
+      );
     }
     const tick = () => {
       if (!this.running)
@@ -164,9 +160,8 @@ export class PartnerReportWorker
       const key = [job.agreement_id, period, job.kind];
       if (eligible) {
         try {
-          await this.transport!.sendMail({
-            from: process.env.PARTNER_MAIL_FROM,
-            to: { name: "", address: job.invite_address },
+          await this.transport!.send({
+            to: job.invite_address,
             messageId: `<${job.agreement_id}.${period}${checkIn ? ".check-in" : ""}@logos.notifications>`,
             subject: invitation
               ? "You have a Logos invitation"
@@ -193,7 +188,7 @@ export class PartnerReportWorker
           );
           await client.query("commit");
           Logger.warn(
-            "Partner email deferred after an SMTP failure.",
+            "Partner email deferred after a delivery failure.",
             "PartnerReportWorker",
           );
           return true;
