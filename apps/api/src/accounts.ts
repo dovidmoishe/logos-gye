@@ -1,3 +1,4 @@
+import { digest, sessionCookie as cookie, sessionLifetime as lifetime } from "./session";
 import {
   BadRequestException,
   Body,
@@ -17,7 +18,6 @@ import {
 } from "@nestjs/common";
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import {
-  createHash,
   randomBytes,
   randomUUID,
   scrypt,
@@ -31,16 +31,7 @@ import { deviceResolver } from "./reporting/adguard";
 import { accounts, devices, sessions } from "./db/schema";
 
 const hashPassword = promisify(scrypt);
-const digest = (value: string) =>
-  createHash("sha256").update(value).digest("hex");
 const token = () => randomBytes(32).toString("base64url");
-const lifetime = 30 * 86400000;
-const cookie = {
-  httpOnly: true,
-  sameSite: "strict" as const,
-  path: "/api/account",
-  secure: process.env.COOKIE_SECURE === "true",
-};
 const deviceFields = {
   id: devices.id,
   name: devices.name,

@@ -28,7 +28,8 @@
     "openai": "^7.65.0",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2",
-    "rxjs": "^7"
+    "rxjs": "^7",
+    "senviok": "1.0.2"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1",

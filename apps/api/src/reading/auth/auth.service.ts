@@ -1,5 +1,6 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
+import { digest } from "../../session";
 import { accounts } from '../../db/schema';
 
 import { users } from '../../db/scripture';
@@ -17,6 +18,14 @@ export class AuthService {
 
   async authenticateBearerToken(authorization?: string): Promise<AuthUser> {
     const token = this.extractBearerToken(authorization);
+    if (token.startsWith('logos_')) {
+      const result = await this.db.execute(sql`
+        select u.id,u.email from account_sessions s join users u on s.owner='supabase:' || u.id::text
+        where s.digest=${digest(token)} and s.expires_at > ${Date.now()}
+      `);
+      if (!result.rows.length) throw new UnauthorizedException('Session expired. Sign in again.');
+      return { id: String(result.rows[0].id), email: String(result.rows[0].email) };
+    }
     const payload = await this.verifyToken(token);
     const userId = payload.sub;
 

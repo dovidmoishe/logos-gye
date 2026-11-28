@@ -62,12 +62,28 @@ final class PilotUITests: XCTestCase {
         forget.tap()
     }
 
+    func testReadWhileAPIIsUnavailable() throws {
+        guard ProcessInfo.processInfo.environment["LOGOS_TEST_UNAVAILABLE_READER"] == "1" else {
+            throw XCTSkip("Requires a simulator build pointing at an unreachable reading API.")
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-homeIntroductionComplete", "YES", "-introAccountPending", "NO", "-reader.live", "YES"]
+        app.launch()
+        app.tabBars.buttons["Read"].tap()
+        XCTAssertTrue(app.staticTexts["A Psalm of David. The LORD is my shepherd; I shall not want."].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["Retry"].waitForExistence(timeout: 22))
+        app.buttons["Retry"].tap()
+        app.buttons["Read Psalm 23 offline"].tap()
+        XCTAssertTrue(app.navigationBars["Psalm 23"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["King James Version"].exists)
+    }
+
     func testLiveChapterFromLocalAPI() throws {
         guard ProcessInfo.processInfo.environment["LOGOS_TEST_LIVE_READER"] == "1" else {
             throw XCTSkip("Requires a running, seeded reading API.")
         }
         let app = XCUIApplication()
-        app.launchArguments = ["-homeIntroductionComplete", "YES", "-reader.live", "YES"]
+        app.launchArguments = ["-homeIntroductionComplete", "YES", "-introAccountPending", "NO", "-reader.live", "YES"]
         app.launch()
         app.tabBars.buttons["Read"].tap()
         let permission = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.buttons["Allow"]

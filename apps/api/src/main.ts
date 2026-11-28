@@ -29,6 +29,7 @@ import type { Request, Response, NextFunction } from "express";
 import { Partners } from "./partners";
 import { Database } from "./db/connection";
 
+import { EmailAuthController, SignInMail } from "./email-auth";
 import { AuthGuard } from "./reading/auth/auth.guard";
 import { AuthService } from "./reading/auth/auth.service";
 import { SupabaseJwtVerifier } from "./reading/auth/supabase-jwt.verifier";
@@ -72,11 +73,11 @@ class PartnerController {
   controllers: [
     FeedController, TopicsController, OnboardingController, InteractionsController, UsersController, LibraryController,
     PartnerController,
-    AccountController,
+    AccountController, EmailAuthController,
     DeviceController,
     AgreementsController,
   ],
-  providers: [Database, PartnerReportWorker, Partners, AccountService, Agreements, FeedService, OnboardingService,
+  providers: [SignInMail, Database, PartnerReportWorker, Partners, AccountService, Agreements, FeedService, OnboardingService,
     InteractionsService, UsersService, ScoringService, AffinityService, AuthGuard, AuthService,
     { provide: DATABASE, inject: [Database], useFactory: (database: Database) => database.db },
     { provide: SUPABASE_JWT_VERIFIER, useClass: SupabaseJwtVerifier }
@@ -86,11 +87,15 @@ class AppModule {}
 export async function createApp(options: NestApplicationOptions = {}) {
   const app = await NestFactory.create(AppModule, options);
   app.enableShutdownHooks();
+  // Only enable this on the private API network behind our single Caddy proxy.
+  if (process.env.LOGOS_BEHIND_PROXY === "true") {
+    app.getHttpAdapter().getInstance().set("trust proxy", 1);
+  }
   app.use("/dns-query", adguardResolver(app.get(Database)));
   app.use("/api/reporting/gateway", gatewayReceiver(app.get(Database)));
   app.use(cookieParser());
   app.use(
-    ["/api/account/login", "/api/account/register", "/api/device/pair"],
+    ["/api/auth/otp", "/api/auth/verify", "/api/account/login", "/api/account/register", "/api/device/pair"],
     rateLimit({
       windowMs: 60000,
       limit: 30,

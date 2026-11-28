@@ -1,8 +1,8 @@
+import NetworkExtension
 import CryptoKit
 import Security
 import SwiftUI
 #if DEBUG
-import NetworkExtension
 import UserNotifications
 #endif
 
@@ -26,10 +26,9 @@ struct FeedPage: Decodable {
     let items: [Item]
     let nextCursor: String?
 }
-private struct HostedSession: Codable {
+private struct LogosSession: Codable {
     struct User: Codable { let id: UUID; let email: String }
     let access_token: String
-    let refresh_token: String
     let expires_at: TimeInterval
     let user: User
 }
@@ -40,34 +39,19 @@ struct ReaderError: LocalizedError {
     var errorDescription: String? { message }
 }
 
-private enum HostedAuthConfiguration {
-    static let hostedProject = URL(string: "https://gazplkkplxiavofhvupb.supabase.co")!
-    static let project: URL = {
-        #if DEBUG && targetEnvironment(simulator)
-        if let raw = Bundle.main.object(forInfoDictionaryKey: "SimulatorAuthOrigin") as? String,
-           let url = URL(string: raw), url.scheme == "http", url.host == "127.0.0.1" { return url }
-        #endif
-        #if DEBUG
-        if Bundle.main.object(forInfoDictionaryKey: "LocalEmailTest") as? String == "YES",
-           let url = ReaderAccount.apiOrigin, url.scheme == "https",
-           url.host?.hasSuffix(".local") == true { return url }
-        #endif
-        return hostedProject
-    }()
-}
 private enum SessionKeychain {
     static let key: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-        kSecAttrService as String: "org.logos.reader." + HostedAuthConfiguration.project.absoluteString, kSecAttrAccount as String: "session"]
-    static func load() throws -> HostedSession? {
+        kSecAttrService as String: "org.logos.email-session." + (ReaderAccount.apiOrigin?.absoluteString ?? "unconfigured"), kSecAttrAccount as String: "session"]
+    static func load() throws -> LogosSession? {
         var query = key
         query[kSecReturnData as String] = true
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess, let data = item as? Data else { throw ReaderError(message: "Unlock your iPhone to access your Logos account.") }
-        return try JSONDecoder().decode(HostedSession.self, from: data)
+        return try JSONDecoder().decode(LogosSession.self, from: data)
     }
-    static func save(_ value: HostedSession?) throws {
+    static func save(_ value: LogosSession?) throws {
         guard let value else {
             let status = SecItemDelete(key as CFDictionary)
             guard status == errSecSuccess || status == errSecItemNotFound else { throw ReaderError(message: "Could not clear your session.") }
@@ -122,18 +106,16 @@ final class ReaderTransport: NSObject, URLSessionTaskDelegate {
         return nil
         #endif
     }()
-    private let authOrigin = HostedAuthConfiguration.project.absoluteString + "/auth/v1/"
-    private let publicKey = "sb_publishable_1DAJK7QWBhBtEEDDe5DVGw_tXQMrdJ9"
-    @Published private var session: HostedSession?
+    private var loginChallenge: String?
+    @Published private var session: LogosSession?
     @Published private(set) var resolverURL: URL?
     @Published var resume: ReadingVerse?
     @Published var live: Bool
-    private var refreshing: Task<HostedSession, Error>?
     var email: String? { session?.user.email }
     var usesLocalTestInbox: Bool {
         #if DEBUG
         return Bundle.main.object(forInfoDictionaryKey: "LocalEmailTest") as? String == "YES"
-            && HostedAuthConfiguration.project != HostedAuthConfiguration.hostedProject
+            && (Self.apiOrigin?.host == "127.0.0.1" || Self.apiOrigin?.host?.hasSuffix(".local") == true)
         #else
         return false
         #endif
@@ -142,7 +124,7 @@ final class ReaderTransport: NSObject, URLSessionTaskDelegate {
     init() {
         let defaults = UserDefaults.standard
         live = defaults.object(forKey: "reader.live") == nil ? Self.apiOrigin != nil : defaults.bool(forKey: "reader.live")
-        session = try? SessionKeychain.load()
+        if let cached = try? SessionKeychain.load(), cached.expires_at > Date.now.timeIntervalSince1970 { session = cached }
         restorePosition()
     }
     #if DEBUG
@@ -194,23 +176,26 @@ final class ReaderTransport: NSObject, URLSessionTaskDelegate {
         return data
     }
     private func auth(_ path: String, body: [String: String], token: String? = nil) async throws -> Data {
-        var req = URLRequest(url: URL(string: authOrigin + path)!, timeoutInterval: 15)
-        req.httpMethod = "POST"
-        if HostedAuthConfiguration.project == HostedAuthConfiguration.hostedProject {
-            req.setValue(publicKey, forHTTPHeaderField: "apikey")
+        guard let base = Self.apiOrigin, let url = URL(string: "/api/auth/" + path, relativeTo: base) else {
+            throw ReaderError(message: "Configure the Logos API address for this build.")
         }
+        var req = URLRequest(url: url, timeoutInterval: 18)
+        req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let token { req.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
         req.httpBody = try JSONEncoder().encode(body)
         return try await send(req)
     }
     func sendSignInCode(email: String) async throws {
-        _ = try await auth("otp", body: ["email": email])
+        struct Challenge: Decodable { let challenge: String }
+        let data = try await auth("otp", body: ["email": email])
+        loginChallenge = try JSONDecoder().decode(Challenge.self, from: data).challenge
     }
 
     func verifySignInCode(email: String, code: String) async throws {
-        let data = try await auth("verify", body: ["email": email, "token": code, "type": "email"])
-        let result = try JSONDecoder().decode(HostedSession.self, from: data)
+        guard let loginChallenge else { throw ReaderError(message: "Request a fresh email code.") }
+        let data = try await auth("verify", body: ["email": email, "token": code, "challenge": loginChallenge])
+        let result = try JSONDecoder().decode(LogosSession.self, from: data)
         try SessionKeychain.save(result)
         session = result
         restorePosition()
@@ -230,29 +215,21 @@ final class ReaderTransport: NSObject, URLSessionTaskDelegate {
         }
         #endif
         resolverURL = nil
-        refreshing?.cancel()
-        refreshing = nil
+        loginChallenge = nil
         try SessionKeychain.save(nil)
         session = nil
         restorePosition()
-        if let old { _ = try? await auth("logout?scope=local", body: [:], token: old.access_token) }
+        if let old { _ = try? await auth("logout", body: [:], token: old.access_token) }
     }
     private func accessToken() async throws -> String {
         guard let current = session else { throw ReaderError(message: "Sign in to your Logos account.") }
-        if current.expires_at > Date.now.timeIntervalSince1970 + 45 { return current.access_token }
-        if let refreshing { return try await refreshing.value.access_token }
-        let task = Task {
-            let data = try await auth("token?grant_type=refresh_token", body: ["refresh_token": current.refresh_token])
-            let result = try JSONDecoder().decode(HostedSession.self, from: data)
-            try Task.checkCancellation()
-            guard result.user.id == current.user.id && session?.refresh_token == current.refresh_token else { throw CancellationError() }
-            try SessionKeychain.save(result)
-            session = result
-            return result
+        guard current.expires_at > Date.now.timeIntervalSince1970 else {
+            try SessionKeychain.save(nil)
+            session = nil
+            restorePosition()
+            throw ReaderError(message: "Your session expired. Sign in again.")
         }
-        refreshing = task
-        defer { refreshing = nil }
-        return try await task.value.access_token
+        return current.access_token
     }
     func request<T: Decodable>(_ path: String, body: [String: Any]? = nil, personal: Bool = true) async throws -> T {
         try await apiRequest("reading/" + path, method: body == nil ? "GET" : "POST", body: body, personal: personal)

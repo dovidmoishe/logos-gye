@@ -20,8 +20,10 @@ struct LiveReader: View {
     @State private var sheet: ReaderSheet?
     @State private var chapter: ReadingVerse?
     @State private var message: String?
-    @State private var fetchOwner: String?
-    private var fetching: Bool { fetchOwner == account.owner }
+    @State private var requestID: UUID?
+    private var fetching: Bool { requestID != nil }
+    @State private var libraryReady = false
+    @State private var offlineChapter = false
     @State private var mutating = false
     @State private var appearedAt = Date.now
     private var current: ReadingVerse? { verses.first { $0.id == page } }
@@ -36,11 +38,17 @@ struct LiveReader: View {
                 }.padding()
             }
             if verses.isEmpty {
-                if fetching { ProgressView().frame(maxHeight: .infinity) }
-                else if message == nil { ContentUnavailableView("No verses yet", systemImage: "book") }
-                Spacer()
+                VStack(alignment: .leading, spacing: 18) {
+                    Spacer(minLength: 0)
+                    Text("Psalm 23:1 · KJV").font(.headline).foregroundStyle(PilotTheme.lilac)
+                    ScrollViewIfNeeded(text: ScriptureReader.verses[0])
+                    Button("Read Psalm 23 offline") { offlineChapter = true }.buttonStyle(.bordered)
+                    Spacer(minLength: 0)
+                    if fetching { ProgressView("Loading verses…").font(.footnote) }
+                }.padding(24).frame(maxWidth: 560, maxHeight: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity)
             } else if typeSize.isAccessibilitySize {
-                if let current { ScrollView { card(current) } }
+                if let verse = current ?? verses.first { ScrollView { card(verse) } }
             } else {
                 ScrollViewReader { proxy in
                     ScrollView(.vertical) {
@@ -65,7 +73,6 @@ struct LiveReader: View {
             } label: { Label("Reader options", systemImage: "ellipsis.circle") }
         }
         .task(id: account.owner) {
-            verses = []; saved = []; liked = []; page = nil; cursor = nil; message = nil; chapter = nil
             await load(reset: true)
             if account.email != nil, sheet == nil, !Task.isCancelled {
                 let profile: ReadingProfile? = try? await account.request("users/me")
@@ -103,6 +110,7 @@ struct LiveReader: View {
                 }
             }
         }
+        .navigationDestination(isPresented: $offlineChapter) { PsalmChapter(selected: 1) }
         .navigationDestination(item: $chapter) { LiveChapter(anchor: $0) }
         .onChange(of: page) { before, after in
             guard let verse = verses.first(where: { $0.id == after }) else { return }
@@ -143,7 +151,7 @@ struct LiveReader: View {
                                 if remove { liked.remove(verse.id) } else { liked.insert(verse.id) }
                             } catch { message = error.localizedDescription }
                         }
-                    }.disabled(mutating)
+                    }.disabled(mutating || (account.email != nil && !libraryReady))
                     Button("Share", systemImage: "square.and.arrow.up") { sharing = verse }
                 } label: { Label("Verse actions", systemImage: "ellipsis") }
                 Spacer()
@@ -160,7 +168,7 @@ struct LiveReader: View {
                         if index + 1 == verses.count, cursor != nil { await load(reset: false) }
                         if index + 1 < verses.count { withAnimation { page = verses[index + 1].id } }
                     }
-                }.disabled(fetching && account.email != nil)
+                }.disabled(fetching && account.email != nil && verse.id == verses.last?.id)
             }.font(.subheadline)
         }.padding(24).frame(maxWidth: 560, maxHeight: .infinity).frame(maxWidth: .infinity)
     }
@@ -180,7 +188,7 @@ struct LiveReader: View {
                     if !isSaved { saved.insert(verse, at: 0) }
                 } catch { message = error.localizedDescription }
             }
-        }.disabled(mutating)
+        }.disabled(mutating || (account.email != nil && !libraryReady))
     }
     private func event(_ kind: String, verse: UUID, duration: Int = 0) async throws {
         let receipt: EventReceipt = try await account.request("interactions", body: [
@@ -189,10 +197,11 @@ struct LiveReader: View {
         guard receipt.accepted == 1 else { throw ReaderError(message: "Could not record this action.") }
     }
     private func load(reset: Bool, restore: Bool = true) async {
-        guard !fetching else { return }
+        guard reset || !fetching else { return }
         let owner = account.owner
-        fetchOwner = owner
-        defer { if fetchOwner == owner { fetchOwner = nil } }
+        let id = UUID()
+        requestID = id
+        defer { if requestID == id { requestID = nil } }
         do {
             let incoming: [ReadingVerse]
             if account.email != nil {
@@ -202,18 +211,12 @@ struct LiveReader: View {
                 do { feed = try await account.request(path) } catch let error as ReaderError where next != nil && error.status == 404 {
                     feed = try await account.request("feed")
                 }
-                guard owner == account.owner else { return }
+                guard owner == account.owner, requestID == id, !Task.isCancelled else { return }
                 incoming = feed.items.map(\.verse)
                 cursor = feed.nextCursor
-                if reset {
-                    let library: ReaderLibrary = try await account.request("library")
-                    guard owner == account.owner else { return }
-                    saved = library.saved
-                    liked = Set(library.liked)
-                }
             } else {
                 let response: VerseList = try await account.request("discover", personal: false)
-                guard owner == account.owner else { return }
+                guard owner == account.owner, requestID == id, !Task.isCancelled else { return }
                 incoming = response.verses
                 cursor = nil
             }
@@ -227,8 +230,18 @@ struct LiveReader: View {
             list.append(contentsOf: incoming.filter { known.insert($0.id).inserted })
             verses = list
             if reset { page = list.first?.id }
-            message = nil
-        } catch { if !Task.isCancelled { message = error.localizedDescription } }
+            message = list.isEmpty ? "Your feed has no verses yet." : nil
+            if reset && account.email != nil && !libraryReady {
+                let library: ReaderLibrary = try await account.request("library")
+                guard owner == account.owner, requestID == id, !Task.isCancelled else { return }
+                saved = library.saved
+                liked = Set(library.liked)
+                libraryReady = true
+            }
+        } catch {
+            guard owner == account.owner, requestID == id, !Task.isCancelled else { return }
+            message = error.localizedDescription
+        }
     }
 }
 
@@ -317,7 +330,7 @@ struct ReaderSignIn: View {
                             .focused($focus, equals: .code)
                             .onChange(of: code) { _, value in
                                 let digits = value.filter { $0.isNumber }.compactMap(\.wholeNumberValue).filter { $0 < 10 }
-                                code = digits.prefix(10).map(String.init).joined()
+                                code = digits.prefix(8).map(String.init).joined()
                             }
                     }.disabled(busy)
                     feedback
@@ -380,7 +393,7 @@ struct ReaderSignIn: View {
 
     private func verify(_ address: String) {
         guard !busy else { return }
-        guard code.count >= 6 else {
+        guard code.count == 8 else {
             message = "Enter the full code from the email."
             focus = .code
             return

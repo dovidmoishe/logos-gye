@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Link from "next/link";
-import { accountAPI as client, logosAuth } from "../../lib/account";
+import { accountAPI as client, emailAuthAPI } from "../../lib/account";
 import { AccountAgreements, ReportPreview } from "./agreements";
 import { WorkspaceShell, type Section } from "./shell";
 import {
@@ -43,6 +43,7 @@ export function AccountWorkspace({ section }: { section: Section }) {
     code: string;
     expiresAt: number;
   } | null>(null);
+  const challenge = useRef("");
   const refreshVersion = useRef(0);
   const refresh = useCallback(async () => {
     const version = ++refreshVersion.current;
@@ -76,19 +77,19 @@ export function AccountWorkspace({ section }: { section: Section }) {
   }
   function resetCode() {
     setCode("");
+    challenge.current = "";
     setSentTo(null);
     setNotice("");
     setError("");
   }
   async function sendCode(address: string) {
-    const { error } = await logosAuth.signInWithOtp({ email: address });
-    if (error) throw error;
+    const { data } = await emailAuthAPI.post<{ challenge: string }>("/otp", { email: address });
+    challenge.current = data.challenge;
     setSentTo(address);
     setCode("");
   }
   useEffect(() => {
     let mounted = true;
-    let scheduled: ReturnType<typeof setTimeout>;
     const load = () => {
       void refresh()
         .catch(() => {
@@ -99,29 +100,10 @@ export function AccountWorkspace({ section }: { section: Section }) {
         });
     };
     load();
-    let subject: string | null = null;
-    const { data } = logosAuth.onAuthStateChange((event, session) => {
-      const next = session?.user.id ?? null;
-      const changed = next !== subject;
-      subject = next;
-      if (
-        event === "SIGNED_OUT" ||
-        event === "USER_UPDATED" ||
-        (event === "SIGNED_IN" && changed)
-      ) {
-        ++refreshVersion.current;
-        setAccount(null);
-        setEnrollment(null);
-        clearTimeout(scheduled);
-        scheduled = setTimeout(load, 0);
-      }
-    });
     window.addEventListener("focus", load);
     return () => {
       mounted = false;
       ++refreshVersion.current;
-      clearTimeout(scheduled);
-      data.subscription.unsubscribe();
       window.removeEventListener("focus", load);
     };
   }, [refresh]);
@@ -139,8 +121,6 @@ export function AccountWorkspace({ section }: { section: Section }) {
       logout={() =>
         void action(async () => {
           await client.delete("/session");
-          const { error } = await logosAuth.signOut({ scope: "local" });
-          if (error && error.name !== "AuthSessionMissingError") throw error;
           setAccount(null);
           setEnrollment(null);
           setUsername("");
@@ -194,12 +174,9 @@ export function AccountWorkspace({ section }: { section: Section }) {
                 if (legacy) {
                   await client.post("/login", { username, password });
                 } else if (sentTo) {
-                  const { error } = await logosAuth.verifyOtp({
-                    email: sentTo,
-                    token: code,
-                    type: "email",
+                  await emailAuthAPI.post("/verify", {
+                    email: sentTo, token: code, challenge: challenge.current, client: "web",
                   });
-                  if (error) throw error;
                 } else {
                   await sendCode(email.trim());
                   return;
@@ -252,8 +229,8 @@ export function AccountWorkspace({ section }: { section: Section }) {
                     type="text"
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    pattern="[0-9]{6,10}"
-                    maxLength={10}
+                    pattern="[0-9]{8}"
+                    maxLength={8}
                     value={code}
                     onChange={(e) =>
                       setCode(e.target.value.replace(/[^0-9]/g, ""))
@@ -275,7 +252,7 @@ export function AccountWorkspace({ section }: { section: Section }) {
             )}
             <button
               className="primary"
-              disabled={busy || Boolean(sentTo && code.length < 6)}
+              disabled={busy || Boolean(sentTo && code.length !== 8)}
             >
               {legacy ? "Sign in" : sentTo ? "Verify code" : "Send code"}
             </button>

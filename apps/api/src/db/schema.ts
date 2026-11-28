@@ -158,3 +158,13 @@ export const liveBlocks = pgTable(
     primaryKey({ columns: [row.agreementId, row.domainKey, row.occurredAt] }),
   ],
 );
+
+export const loginChallenges = pgTable("login_challenges", {
+  email: text("email").primaryKey(),
+  challengeHash: text("challenge_hash").notNull(),
+  codeHash: text("code_hash").notNull(),
+  sentAt: bigint("sent_at", { mode: "number" }).notNull(),
+  windowStart: bigint("window_start", { mode: "number" }).notNull(),
+  sends: integer("sends").notNull(),
+  attempts: integer("attempts").notNull(),
+});

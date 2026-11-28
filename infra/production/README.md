@@ -1,6 +1,6 @@
 # Logos production
 
-Caddy terminates HTTPS on withlogos.app, redirects the apex to app.withlogos.app, and forwards the dashboard and same-origin API. The DNS hostname exposes the device-authenticated DNS-over-HTTPS path. Only Caddy publishes container ports. The API verifies identities against the hosted Logos Supabase project. The iOS Release configuration targets the public API. Local Debug configuration can still use the Mac.
+Caddy terminates HTTPS on withlogos.app, redirects the apex to app.withlogos.app, and forwards the dashboard and same-origin API. The DNS hostname exposes the device-authenticated DNS-over-HTTPS path. Only Caddy publishes container ports. The API issues email-code sessions and still verifies Supabase tokens from earlier builds. The iOS Release configuration targets the public API. Local Debug configuration can still use the Mac.
 
 ## Release
 
@@ -23,4 +23,4 @@ Install the supplied systemd service and timer. Daily dumps go to /var/backups/l
 
 ## Mail
 
-Set PARTNER_MAIL_FROM to the verified sender and SENVIOK_API_KEY in the root-only .env for HTTPS delivery. Recreate the API after a credential change. The worker shares the same queue and consent checks across HTTPS and SMTP. Deployments using SMTP can supply PARTNER_SMTP_URL instead. With neither credential configured, mail stays queued. Configure hosted Supabase OTP delivery separately.
+Set PARTNER_MAIL_FROM to the verified sender and SENVIOK_API_KEY in the root-only .env for HTTPS delivery. Recreate the API after a credential change. The worker shares the same queue and consent checks across HTTPS and SMTP. Deployments using SMTP can supply PARTNER_SMTP_URL instead. With neither credential configured, mail stays queued. The Logos OTP endpoints use the same sender settings. Release the API migration before updating the dashboard and iPhone clients.

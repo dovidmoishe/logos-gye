@@ -25,6 +25,7 @@ services:
     environment:
       DATABASE_URL: postgresql://logos:${DB_PASSWORD:?}@db:5432/logos
       COOKIE_SECURE: "true"
+      LOGOS_BEHIND_PROXY: "true"
       SUPABASE_URL: https://gazplkkplxiavofhvupb.supabase.co
       ADGUARD_DEVICE_SECRET: ${ADGUARD_DEVICE_SECRET:?}
       ADGUARD_PUBLIC_ORIGIN: https://dns.withlogos.app

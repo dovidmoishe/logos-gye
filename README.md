@@ -30,11 +30,11 @@ API_ORIGIN sets the Next.js proxy upstream at build time.
 
 ## Scripture and Logos accounts
 
-Both clients use the existing Logos Supabase project for passwordless email authentication. New and returning readers enter their email, then verify the one-time code on the next screen. Nest verifies the JWT issuer, audience, expiry and signature with the project’s public keys. Scripture, topics, interactions, saved state and pilot agreements live in local PostgreSQL. Existing pilot users can still use their legacy dashboard login.
+Logos issues its own passwordless sessions. The dashboard and iPhone request an eight-digit code from `POST /api/auth/otp` and submit the code and returned challenge to `POST /api/auth/verify`. Codes expire after ten minutes, allow five guesses, and can be used once. Sessions last 30 days. The dashboard uses an HTTP-only cookie and the iPhone stores its bearer token in Keychain.
 
-To enable code delivery in a hosted project, connect a custom SMTP sender in Supabase **Authentication → Emails → SMTP Settings**. Under **Templates**, apply [the Logos email body](infra/supabase/email-code.html) to both **Confirm sign up** and **Magic link or OTP**, with the subject “Your Logos sign-in code”. Supabase substitutes the current one-time code for `{{ .Token }}`.
+Configure `SENVIOK_API_KEY` and the verified `PARTNER_MAIL_FROM` on the API, or use `PARTNER_SMTP_URL` for local Mailpit delivery. Both clients prompt for email again after upgrading. Verification reuses the existing local reading UUID for that email, preserving devices and partner relationships. The API still accepts valid Supabase JWTs from older clients and supports the legacy pilot dashboard login.
 
-To restore a full local backup into an empty database on a PostgreSQL server with pgvector installed, use `pg_restore --exit-on-error --single-transaction --no-owner --no-acl -d NEW_DATABASE /path/to/logos-local.dump`. Point DATABASE_URL at that database before starting Nest. Supabase authentication continues to use the hosted project. A six-table hosted Scripture dump is a content archive and requires the application schema before data-only restore.
+To restore a full local backup into an empty database on a PostgreSQL server with pgvector installed, use `pg_restore --exit-on-error --single-transaction --no-owner --no-acl -d NEW_DATABASE /path/to/logos-local.dump`. Point DATABASE_URL at that database before starting Nest. A six-table hosted Scripture dump is a content archive and requires the application schema before data-only restore.
 
 For a fresh development database without a dump, run `npm run seed:scripture -w @logos/api` after starting Nest once. This loads the KJV and generates starter topic associations. The hosted Scripture archive includes the original IDs, embeddings and trained relevance scores. Use that archive for parity with the original Logos content.
 

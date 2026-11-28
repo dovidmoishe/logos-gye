@@ -61,7 +61,7 @@ struct PilotHome: View {
                     .tabItem { Label("Home", systemImage: "house") }.tag(AppTab.home)
                     NavigationStack(path: $readerPath) {
                         if reader.live {
-                            LiveReader(finish: { tab = .home })
+                            LiveReader(finish: { tab = .home }).id(reader.owner)
                         } else {
                             ScriptureReader(verse: $readingVerse, finish: { tab = .home })
                                 .toolbar { Button("Explore KJV") { reader.setLive(true) } }

@@ -84,7 +84,7 @@ struct ScriptureReader: View {
     }
 }
 
-private struct PsalmChapter: View {
+struct PsalmChapter: View {
     let selected: Int
 
     var body: some View {
