@@ -1,0 +1,75 @@
+name: Deploy Logos
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: logos-production
+  cancel-in-progress: false
+
+jobs:
+  images:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+    outputs:
+      api: ${{ steps.api.outputs.digest }}
+      dashboard: ${{ steps.dashboard.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify CI passed for this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          result=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=push&branch=main&head_sha=$GITHUB_SHA" --jq '.workflow_runs[0].conclusion')
+          test "$result" = success
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@v6
+        id: api
+        with:
+          context: .
+          file: infra/Dockerfile
+          target: api
+          push: true
+          tags: ghcr.io/dovidmoishe/logos-gye-api:${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        id: dashboard
+        with:
+          context: .
+          file: infra/Dockerfile
+          target: dashboard
+          push: true
+          tags: ghcr.io/dovidmoishe/logos-gye-dashboard:${{ github.sha }}
+
+  deploy:
+    needs: images
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      packages: read
+    steps:
+      - name: Activate release
+        env:
+          DEPLOY_KEY: ${{ secrets.LOGOS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ vars.LOGOS_KNOWN_HOSTS }}
+          API_DIGEST: ${{ needs.images.outputs.api }}
+          DASHBOARD_DIGEST: ${{ needs.images.outputs.dashboard }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/logos
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "ghcr.io/dovidmoishe/logos-gye-api@$API_DIGEST" "ghcr.io/dovidmoishe/logos-gye-dashboard@$DASHBOARD_DIGEST" "$GITHUB_ACTOR" "$REGISTRY_TOKEN" |
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -i ~/.ssh/logos root@162.35.53.35

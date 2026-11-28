@@ -4,3 +4,7 @@
 **/.next
 **/dist
 apps/ios
+**/.env
+**/.env.*
+**/*.pem
+**/*.dump

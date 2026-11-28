@@ -7,16 +7,21 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		19A98069E8C60EC3DBA3F115 /* ShieldConfigurationExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1333D58EF25622E71F241D /* ShieldConfigurationExtension.swift */; };
 		1C4006E4CACACBFCB64035B5 /* FFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 16D36E874566AAFE23A61FF6 /* FFL.txt */; };
+		2460254EA46DE9409CAA024E /* ScreenTimeProtection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67F227485DE13E8B92838E8A /* ScreenTimeProtection.swift */; };
 		256FF4D5E8CBEF9B4DA112F3 /* Urbanist-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8D6138A30F1285528FD812ED /* Urbanist-SemiBold.ttf */; };
 		2AA23A5CC2F1B6B668342741 /* PilotHome.swift in Sources */ = {isa = PBXBuildFile; fileRef = E96BA6119FE799F4906A1845 /* PilotHome.swift */; };
-		C8A1501CA30447E290D63001 /* ScriptureReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A1501CA30447E290D63002 /* ScriptureReader.swift */; };
-		D2A1501CA30447E290D63001 /* ReaderClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A1501CA30447E290D63002 /* ReaderClient.swift */; };
-		D2A1501CA30447E290D63003 /* LiveReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A1501CA30447E290D63004 /* LiveReader.swift */; };
+		324A7748FBE66E4D1DA4FF6C /* LogosShield.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 305784DE51F49BD2B65D6C49 /* LogosShield.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		437F42301DCCCFB1018D214D /* Mark.png in Resources */ = {isa = PBXBuildFile; fileRef = 186ACD969741CAD04E5C226B /* Mark.png */; };
 		8CC336716188508AB022D05E /* PilotApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A3226F93FCF5679BEADE94C /* PilotApp.swift */; };
 		98EC3CC39C2F8422C1609D57 /* PilotUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC547CA3886CE2ACC0F270F8 /* PilotUITests.swift */; };
 		B61113EB72DDDFD154B0F683 /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9408F712AE4BA360445740DC /* OFL.txt */; };
 		BEDA77304C7654CAFCD39CA3 /* DashboardConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 055446FF760C5E281BF5FF6D /* DashboardConnection.swift */; };
+		C786DB509E46B7F2E155DEA1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 69B8DA12E5D3E2431D068831 /* Foundation.framework */; };
+		C8A1501CA30447E290D63001 /* ScriptureReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A1501CA30447E290D63002 /* ScriptureReader.swift */; };
+		D2A1501CA30447E290D63001 /* ReaderClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A1501CA30447E290D63002 /* ReaderClient.swift */; };
+		D2A1501CA30447E290D63003 /* LiveReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A1501CA30447E290D63004 /* LiveReader.swift */; };
 		E19B2BEF35405F59A6A6A033 /* ResolverProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32EB02244935879AD672A72 /* ResolverProbe.swift */; };
 		E6709E0EB34CE8DDDF1C5CBB /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E09BF5F01CD3F3A8EB3CC62C /* Foundation.framework */; };
 		EAD5C1B98D3F14CE2FA9726B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B6247D1B2B000DC6E8BCC97 /* Assets.xcassets */; };
@@ -30,29 +35,65 @@
 			remoteGlobalIDString = 0A492CA37BEC5A3395522308;
 			remoteInfo = Logos;
 		};
+		899A826BB0D86276B2BAC690 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 826DB2979B6F540FBB49D228 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 76177C586EB3DA8140D9D9AD;
+			remoteInfo = LogosShield;
+		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		8F9CB431D14D6974ACD9E5E0 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				324A7748FBE66E4D1DA4FF6C /* LogosShield.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		DF922229A30447E290D47853 /* ReaderDebug.xcconfig */ = { isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ReaderDebug.xcconfig; sourceTree = SOURCE_ROOT; };
 		055446FF760C5E281BF5FF6D /* DashboardConnection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardConnection.swift; sourceTree = "<group>"; };
+		164C34EB680E72C8BB3C9389 /* LogosShield.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = LogosShield.entitlements; sourceTree = "<group>"; };
 		16D36E874566AAFE23A61FF6 /* FFL.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = FFL.txt; sourceTree = "<group>"; };
+		186ACD969741CAD04E5C226B /* Mark.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; name = Mark.png; path = ../Pilot/Assets.xcassets/BrandMark.imageset/Mark.png; sourceTree = "<group>"; };
 		2A3226F93FCF5679BEADE94C /* PilotApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PilotApp.swift; sourceTree = "<group>"; };
 		2B6247D1B2B000DC6E8BCC97 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		2F1333D58EF25622E71F241D /* ShieldConfigurationExtension.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShieldConfigurationExtension.swift; sourceTree = "<group>"; };
+		305784DE51F49BD2B65D6C49 /* LogosShield.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LogosShield.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		44CF23A1B95EC08CD0CCA92C /* PilotUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PilotUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4D966B3760875950B62537C4 /* Logos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = Logos.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		67F227485DE13E8B92838E8A /* ScreenTimeProtection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenTimeProtection.swift; sourceTree = "<group>"; };
+		69B8DA12E5D3E2431D068831 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		8D6138A30F1285528FD812ED /* Urbanist-SemiBold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; path = "Urbanist-SemiBold.ttf"; sourceTree = "<group>"; };
 		9408F712AE4BA360445740DC /* OFL.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = OFL.txt; sourceTree = "<group>"; };
 		94B0736B60F857DB816759F8 /* Pilot.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Pilot.entitlements; sourceTree = "<group>"; };
-		DC547CA3886CE2ACC0F270F8 /* PilotUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PilotUITests.swift; sourceTree = "<group>"; };
-		E09BF5F01CD3F3A8EB3CC62C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
-		E96BA6119FE799F4906A1845 /* PilotHome.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PilotHome.swift; sourceTree = "<group>"; };
 		C8A1501CA30447E290D63002 /* ScriptureReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScriptureReader.swift; sourceTree = "<group>"; };
+		CE449BDC0D9DEF89CF2EA033 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		D2A1501CA30447E290D63002 /* ReaderClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReaderClient.swift; sourceTree = "<group>"; };
 		D2A1501CA30447E290D63004 /* LiveReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveReader.swift; sourceTree = "<group>"; };
+		DC547CA3886CE2ACC0F270F8 /* PilotUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PilotUITests.swift; sourceTree = "<group>"; };
+		DF922229A30447E290D47853 /* ReaderDebug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ReaderDebug.xcconfig; sourceTree = SOURCE_ROOT; };
+		E09BF5F01CD3F3A8EB3CC62C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		E96BA6119FE799F4906A1845 /* PilotHome.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PilotHome.swift; sourceTree = "<group>"; };
 		F32EB02244935879AD672A72 /* ResolverProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResolverProbe.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		5CE1906F4538CD2958674838 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C786DB509E46B7F2E155DEA1 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8AAE880C5C614D06049D2667 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -69,6 +110,7 @@
 			children = (
 				4D966B3760875950B62537C4 /* Logos.app */,
 				44CF23A1B95EC08CD0CCA92C /* PilotUITests.xctest */,
+				305784DE51F49BD2B65D6C49 /* LogosShield.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -86,8 +128,21 @@
 				2B6247D1B2B000DC6E8BCC97 /* Assets.xcassets */,
 				94E571CFAB4D2774884F40D0 /* Fonts */,
 				055446FF760C5E281BF5FF6D /* DashboardConnection.swift */,
+				67F227485DE13E8B92838E8A /* ScreenTimeProtection.swift */,
 			);
 			path = Pilot;
+			sourceTree = "<group>";
+		};
+		13BBDD36907292CCF6985652 /* LogosShield */ = {
+			isa = PBXGroup;
+			children = (
+				2F1333D58EF25622E71F241D /* ShieldConfigurationExtension.swift */,
+				CE449BDC0D9DEF89CF2EA033 /* Info.plist */,
+				164C34EB680E72C8BB3C9389 /* LogosShield.entitlements */,
+				186ACD969741CAD04E5C226B /* Mark.png */,
+			);
+			name = LogosShield;
+			path = LogosShield;
 			sourceTree = "<group>";
 		};
 		1C68170681D2F0821B3FB65B /* Frameworks */ = {
@@ -106,6 +161,7 @@
 				1C68170681D2F0821B3FB65B /* Frameworks */,
 				4E0B8822F8E2E30DC3BDF9A7 /* PilotUITests */,
 				DF922229A30447E290D47853 /* ReaderDebug.xcconfig */,
+				13BBDD36907292CCF6985652 /* LogosShield */,
 			);
 			sourceTree = "<group>";
 		};
@@ -133,6 +189,7 @@
 			isa = PBXGroup;
 			children = (
 				E09BF5F01CD3F3A8EB3CC62C /* Foundation.framework */,
+				69B8DA12E5D3E2431D068831 /* Foundation.framework */,
 			);
 			name = iOS;
 			sourceTree = "<group>";
@@ -147,10 +204,12 @@
 				527EA9FD2F485B7AA80BE9C9 /* Sources */,
 				7067B600839C3081631F46CC /* Resources */,
 				E92B1E0349832BDC5CBC97A7 /* Embed Satoshi */,
+				8F9CB431D14D6974ACD9E5E0 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				2CC7199CA8AC59636D61DBCE /* PBXTargetDependency */,
 			);
 			name = Logos;
 			productName = Logos;
@@ -174,6 +233,23 @@
 			productName = PilotUITests;
 			productReference = 44CF23A1B95EC08CD0CCA92C /* PilotUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		76177C586EB3DA8140D9D9AD /* LogosShield */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C399F61CA975D3A498A52489 /* Build configuration list for PBXNativeTarget "LogosShield" */;
+			buildPhases = (
+				D75F4FB7D8814A7E9D5A6109 /* Sources */,
+				5CE1906F4538CD2958674838 /* Frameworks */,
+				A22395FA1BF61043216D1078 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LogosShield;
+			productName = LogosShield;
+			productReference = 305784DE51F49BD2B65D6C49 /* LogosShield.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -206,6 +282,7 @@
 			targets = (
 				0A492CA37BEC5A3395522308 /* Logos */,
 				2A9CB32D866507BCFD0E5445 /* PilotUITests */,
+				76177C586EB3DA8140D9D9AD /* LogosShield */,
 			);
 		};
 /* End PBXProject section */
@@ -226,6 +303,14 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A22395FA1BF61043216D1078 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				437F42301DCCCFB1018D214D /* Mark.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -266,6 +351,7 @@
 				D2A1501CA30447E290D63001 /* ReaderClient.swift in Sources */,
 				D2A1501CA30447E290D63003 /* LiveReader.swift in Sources */,
 				BEDA77304C7654CAFCD39CA3 /* DashboardConnection.swift in Sources */,
+				2460254EA46DE9409CAA024E /* ScreenTimeProtection.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,6 +363,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D75F4FB7D8814A7E9D5A6109 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				19A98069E8C60EC3DBA3F115 /* ShieldConfigurationExtension.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -285,6 +379,12 @@
 			name = Logos;
 			target = 0A492CA37BEC5A3395522308 /* Logos */;
 			targetProxy = 29C67742807481CBFDD73BBF /* PBXContainerItemProxy */;
+		};
+		2CC7199CA8AC59636D61DBCE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = LogosShield;
+			target = 76177C586EB3DA8140D9D9AD /* LogosShield */;
+			targetProxy = 899A826BB0D86276B2BAC690 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -301,6 +401,28 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = Logos;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		48297869911C2350CAA3CB9C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = LogosShield/LogosShield.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LogosShield/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = org.logosgye.filterpilot.shield;
+				PRODUCT_NAME = LogosShield;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -329,13 +451,14 @@
 		7ABBA491ACF95D6685E90F33 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				LOGOS_READER_API = "https://app.withlogos.app";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Pilot/Pilot.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Pilot/ReaderInfo.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Logos";
+				INFOPLIST_KEY_CFBundleDisplayName = Logos;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				MARKETING_VERSION = 0.1;
@@ -350,20 +473,41 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = DF922229A30447E290D47853 /* ReaderDebug.xcconfig */;
 			buildSettings = {
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Pilot/Pilot.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Pilot/ReaderInfo.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Logos";
+				INFOPLIST_KEY_CFBundleDisplayName = Logos;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = org.logosgye.filterpilot;
 				PRODUCT_NAME = Logos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		B6BF9D50068CDE24E9EC97CC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = LogosShield/LogosShield.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LogosShield/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = org.logosgye.filterpilot.shield;
+				PRODUCT_NAME = LogosShield;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
@@ -391,6 +535,15 @@
 			buildConfigurations = (
 				4854732140C25A5D9F7E78B2 /* Debug */,
 				76BD622DA4FD553BA9856F45 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C399F61CA975D3A498A52489 /* Build configuration list for PBXNativeTarget "LogosShield" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				48297869911C2350CAA3CB9C /* Release */,
+				B6BF9D50068CDE24E9EC97CC /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

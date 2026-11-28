@@ -1,5 +1,6 @@
 const localAuth = process.env.LOGOS_LOCAL_EMAIL_TEST === "true";
 export default {
+  output: "standalone",
   agentRules: false,
   devIndicators: false,
   env: { NEXT_PUBLIC_LOCAL_EMAIL_TEST: localAuth ? "true" : "false" },

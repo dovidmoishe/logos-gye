@@ -359,54 +359,66 @@ export function AccountWorkspace({ section }: { section: Section }) {
         </>
       ) : (
         <>
-          <form
-            className="panel account-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void action(async () => {
-                setEnrollment((await client.post("/devices", { name })).data);
-                await refresh();
-              });
-            }}
-          >
-            <h2>Enroll an iPhone</h2>
-            <small>Signed in as {account.username}</small>
-            <label>
-              Device name
-              <input
-                required
-                maxLength={80}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <button disabled={busy} className="primary">
-              Create pairing pass
-            </button>
-          </form>
-          {enrollment &&
-            account.devices.some(
-              (d) => d.id === enrollment.id && d.state === "pending",
-            ) && (
-              <section className="panel account-form">
-                <h2>Pair on your iPhone</h2>
-                <p>
-                  In Logos, open Protection → Dashboard connection. Paste this
-                  pass before{" "}
-                  {new Date(enrollment.expiresAt).toLocaleTimeString()}.
-                </p>
+          <p>
+            Sign in to Logos on your iPhone and it will appear here
+            automatically.
+          </p>
+          <details>
+            <summary>Connect an older or guest app</summary>
+            <form
+              className="panel account-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void action(async () => {
+                  setEnrollment((await client.post("/devices", { name })).data);
+                  await refresh();
+                });
+              }}
+            >
+              <h2>Enroll an iPhone</h2>
+              <small>Signed in as {account.username}</small>
+              <label>
+                Device name
                 <input
-                  aria-label="Pairing pass"
-                  readOnly
-                  value={(process.env.NEXT_PUBLIC_PAIRING_ORIGIN || window.location.origin) + "#" + enrollment.code}
-                  onFocus={(e) => e.target.select()}
+                  required
+                  maxLength={80}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
-                <small>
-                  Single use. Your phone needs a trusted HTTPS address for this
-                  dashboard. Localhost works in the iOS simulator.
-                </small>
-              </section>
-            )}
+              </label>
+              <button disabled={busy} className="primary">
+                Create pairing pass
+              </button>
+            </form>
+            {enrollment &&
+              account.devices.some(
+                (d) => d.id === enrollment.id && d.state === "pending",
+              ) && (
+                <section className="panel account-form">
+                  <h2>Pair on your iPhone</h2>
+                  <p>
+                    In Logos, open Protection → Dashboard connection. Paste this
+                    pass before{" "}
+                    {new Date(enrollment.expiresAt).toLocaleTimeString()}.
+                  </p>
+                  <input
+                    aria-label="Pairing pass"
+                    readOnly
+                    value={
+                      (process.env.NEXT_PUBLIC_PAIRING_ORIGIN ||
+                        window.location.origin) +
+                      "#" +
+                      enrollment.code
+                    }
+                    onFocus={(e) => e.target.select()}
+                  />
+                  <small>
+                    Single use. Your phone needs a trusted HTTPS address for
+                    this dashboard. Localhost works in the iOS simulator.
+                  </small>
+                </section>
+              )}
+          </details>
           <section className="panel">
             <div className="panelhead">
               <h2>Enrolled devices</h2>
@@ -429,7 +441,7 @@ export function AccountWorkspace({ section }: { section: Section }) {
                       {d.state === "paired"
                         ? d.lastCheck
                           ? outcomes[d.lastCheck]
-                          : "Paired · waiting for a safe check"
+                          : "Connected · waiting for a safe check"
                         : d.state === "expired"
                           ? "Pairing pass expired"
                           : "Awaiting pairing"}

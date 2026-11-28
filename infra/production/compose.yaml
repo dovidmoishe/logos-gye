@@ -1,0 +1,71 @@
+name: logos
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api: { condition: service_healthy }
+      dashboard: { condition: service_healthy }
+  dashboard:
+    image: ${DASHBOARD_IMAGE:?}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/account').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+  api:
+    image: ${API_IMAGE:?}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://logos:${DB_PASSWORD:?}@db:5432/logos
+      COOKIE_SECURE: "true"
+      SUPABASE_URL: https://gazplkkplxiavofhvupb.supabase.co
+      ADGUARD_DEVICE_SECRET: ${ADGUARD_DEVICE_SECRET:?}
+      ADGUARD_PUBLIC_ORIGIN: https://dns.withlogos.app
+      ADGUARD_INTERNAL_ORIGIN: http://adguard:3000
+      PARTNER_DASHBOARD_ORIGIN: https://app.withlogos.app
+      PARTNER_SMTP_URL: ${PARTNER_SMTP_URL:-}
+      PARTNER_MAIL_FROM: ${PARTNER_MAIL_FROM:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/account').then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 4s
+      retries: 10
+    depends_on:
+      db: { condition: service_healthy }
+      adguard: { condition: service_started }
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: logos
+      POSTGRES_USER: logos
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logos -d logos"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  adguard:
+    image: adguard/adguardhome:v1.0.0
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        cp /etc/logos/AdGuardHome.yaml /opt/adguardhome/conf/AdGuardHome.yaml
+        exec /opt/adguardhome/AdGuardHome --no-check-update -c /opt/adguardhome/conf/AdGuardHome.yaml -w /opt/adguardhome/work
+    volumes:
+      - ../adguard/AdGuardHome.yaml:/etc/logos/AdGuardHome.yaml:ro
+      - adguard-data:/opt/adguardhome/work
+volumes:
+  caddy-data:
+  caddy-config:
+  postgres-data:
+  adguard-data:

@@ -46,7 +46,7 @@ export async function bindSource(
       select a.id,d.id,(extract(epoch from clock_timestamp())*1000)::bigint,${source.account},${source.registration},${source.policy}
       from account_agreements a join devices d on d.owner=a.owner
       where a.id=${agreement} and a.status='Connected' and a.scope=${reportScope}
-        and d.id=${device} and d.credential_digest is not null
+        and d.id=${device} and (d.credential_digest is not null or d.installation_id is not null)
       for update of a,d
       on conflict do nothing returning agreement_id`);
     if (!result.rowCount)
@@ -161,7 +161,7 @@ export async function importWeek(
       from agreement_reporting_sources s join account_agreements a on a.id=s.agreement_id
       join devices d on d.id=s.device_id and d.owner=a.owner
       where a.id=$1 and a.scope=$2 and a.status='Connected' and a.accepted_at <= $3
-        and s.registered_at <= $3 and d.credential_digest is not null for update of a,s,d`,
+        and s.registered_at <= $3 and (d.credential_digest is not null or d.installation_id is not null) for update of a,s,d`,
       [agreement, reportScope, start],
     );
     if (

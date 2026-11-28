@@ -1,6 +1,27 @@
 import XCTest
 
 final class PilotUITests: XCTestCase {
+    func testShieldControlInProtection() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-homeIntroductionComplete", "YES"]
+        app.launch()
+        enterHomeIfNeeded(app)
+        app.tabBars.buttons["Protection"].tap()
+        XCTAssertTrue(app.buttons["Enable Screen Time shield"].exists || app.buttons["Choose apps and websites"].exists)
+        XCTAssertTrue(app.navigationBars["Protection"].exists)
+    }
+
+    func testFamiliesProfileExplainsReportingOnPhone() throws {
+        guard ProcessInfo.processInfo.environment["LOGOS_TEST_FAMILIES_PROFILE"] == "1" else {
+            throw XCTSkip("Requires an iPhone using the Families profile.")
+        }
+        let app = XCUIApplication()
+        app.launch()
+        enterHomeIfNeeded(app)
+        app.tabBars.buttons["Protection"].tap()
+        XCTAssertTrue(app.staticTexts["familiesFilterNotice"].waitForExistence(timeout: 6))
+    }
+
     func testSelectedDNSBlocksHarmlessFixtureOnPhone() throws {
         guard ProcessInfo.processInfo.environment["LOGOS_TEST_SELECTED_DNS"] == "1" else {
             throw XCTSkip("Requires an iPhone with filtering selected.")
@@ -9,10 +30,13 @@ final class PilotUITests: XCTestCase {
         app.launch()
         enterHomeIfNeeded(app)
         app.tabBars.buttons["Protection"].tap()
-        app.buttons["Run safe DNS check"].tap()
+        let accountCheck = app.buttons["Run and save safe check"]
+        let savesToAccount = accountCheck.exists
+        (savesToAccount ? accountCheck : app.buttons["Run safe DNS check"]).tap()
         let blocked = app.staticTexts["currentDNSCheck"].firstMatch
         XCTAssertTrue(blocked.waitForExistence(timeout: 20))
         XCTAssertTrue(blocked.label.contains("The safe category test was blocked and the control domain resolved."))
+        if savesToAccount { XCTAssertTrue(app.staticTexts["Check saved to your account."].waitForExistence(timeout: 12)) }
     }
 
     func testShareSafeCheckWithDashboard() throws {
@@ -23,6 +47,7 @@ final class PilotUITests: XCTestCase {
         app.launch()
         enterHomeIfNeeded(app)
         app.tabBars.buttons["Protection"].tap()
+        guard app.buttons["Dashboard connection"].exists else { throw XCTSkip("Legacy pairing requires a guest session.") }
         app.buttons["Dashboard connection"].tap()
         let forget = app.buttons["Forget connection"]
         if forget.exists { throw XCTSkip("Run pairing on a simulator with no existing dashboard connection.") }

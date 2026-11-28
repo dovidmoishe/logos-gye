@@ -17,9 +17,16 @@ type Agreement = {
   id: string;
   owner: string;
   recipient: string;
+  ownerAlerts: boolean;
+  partnerAlerts: boolean;
   expiresAt: number;
   createdAt: number;
   status: "Pending" | "Connected" | "Expired" | "Revoked" | "Declined";
+};
+
+type LiveActivity = {
+  status: "off" | "awaiting_source" | "awaiting_events" | "observed";
+  groupedRequests: number | null;
 };
 
 type WeeklyReport = {
@@ -28,7 +35,13 @@ type WeeklyReport = {
   weekEnd: number;
   groupedRequests: number | null;
 };
-function WeekResult({ report }: { report: WeeklyReport }) {
+function WeekResult({
+  report,
+  activity,
+}: {
+  report: WeeklyReport;
+  activity: LiveActivity;
+}) {
   const date = (n: number) =>
     new Date(n).toLocaleDateString(undefined, {
       month: "short",
@@ -37,6 +50,18 @@ function WeekResult({ report }: { report: WeeklyReport }) {
     });
   return (
     <div className="sample" role="status">
+      {activity.status !== "off" && (
+        <>
+          <strong>This week so far</strong>
+          <p>
+            {activity.status === "observed"
+              ? "Grouped requests observed: " + activity.groupedRequests
+              : activity.status === "awaiting_source"
+                ? "Activity reporting hasn’t been connected for this iPhone yet."
+                : "Waiting for the first reported block."}
+          </p>
+        </>
+      )}
       <strong>
         {date(report.weekStart)} – {date(report.weekEnd - 1)} · UTC
       </strong>
@@ -69,11 +94,12 @@ export function ReportPreview() {
         <strong>—</strong>
       </div>
       <small>
-        The pilot measures one enrolled iPhone for a full week. Requests can come from
-        background activity.
+        The pilot measures one enrolled iPhone for a full week. Requests can
+        come from background activity.
       </small>
       <div className="scope-note">
-        Your partner sees only the weekly count. Domain names, coverage gaps, reading history and check-ins are excluded.
+        Partners see the weekly count. Both can also enable live counts and
+        check-in emails. Domain names and personal check-ins stay private.
       </div>
     </section>
   );
@@ -83,6 +109,7 @@ export function AccountAgreements({ username }: { username: string }) {
   const [opened, setOpened] = useState<{
     id: string;
     report: WeeklyReport;
+    activity: LiveActivity;
   } | null>(null);
   const [rows, setRows] = useState<Agreement[]>([]);
   const [recipient, setRecipient] = useState("");
@@ -98,6 +125,7 @@ export function AccountAgreements({ username }: { username: string }) {
       setError("");
       setNotice("");
       setOpened(null);
+      setReportId(null);
       try {
         setRows((await call()).data);
         setLoaded(true);
@@ -130,21 +158,45 @@ export function AccountAgreements({ username }: { username: string }) {
       );
     }
   }
-  async function openReport(id: string) {
-    setOpened(null);
-    setBusy(true);
-    setError("");
-    try {
-      setOpened({
-        id,
-        report: (await api.get<WeeklyReport>("/agreements/" + id + "/report"))
-          .data,
-      });
-    } catch {
-      setError("Report unavailable. Refresh your agreements to check access.");
-    } finally {
-      setBusy(false);
+  const [reportId, setReportId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!reportId) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    async function loadReport() {
+      try {
+        const [report, activity] = await Promise.all([
+          api.get<WeeklyReport>("/agreements/" + reportId + "/report"),
+          api.get<LiveActivity>("/agreements/" + reportId + "/activity"),
+        ]);
+        if (active) {
+          setOpened({
+            id: reportId!,
+            report: report.data,
+            activity: activity.data,
+          });
+          timer = setTimeout(loadReport, 15000);
+        }
+      } catch {
+        if (active) {
+          setOpened(null);
+          setReportId(null);
+          setError(
+            "Report unavailable. Refresh your agreements to check access.",
+          );
+        }
+      }
     }
+    void loadReport();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [reportId]);
+  function openReport(id: string) {
+    setError("");
+    setOpened(null);
+    setReportId(id === reportId ? null : id);
   }
   function agreement(row: Agreement) {
     const outgoing = row.owner === username;
@@ -179,6 +231,29 @@ export function AccountAgreements({ username }: { username: string }) {
               })
             : "Weekly grouped counts"}
         </small>
+        {row.status === "Connected" && row.recipient.includes("@") && (
+          <div className="agreement-detail">
+            <label className="consent">
+              <input
+                type="checkbox"
+                disabled={busy}
+                checked={outgoing ? row.ownerAlerts : row.partnerAlerts}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  void run(() =>
+                    api.patch("/agreements/" + row.id + "/alerts", { enabled }),
+                  );
+                }}
+              />
+              Check-in emails
+            </label>
+            <small>
+              {row.ownerAlerts && row.partnerAlerts
+                ? "Both agreed. Check-in emails are on."
+                : "When both agree, share this week’s observed count and email the partner after a filter block. Up to one email per hour."}
+            </small>
+          </div>
+        )}
         <div className="row-actions">
           {row.status === "Pending" && !outgoing && (
             <>
@@ -218,7 +293,9 @@ export function AccountAgreements({ username }: { username: string }) {
             </button>
           )}
         </div>
-        {opened?.id === row.id && <WeekResult report={opened.report} />}
+        {opened?.id === row.id && (
+          <WeekResult report={opened.report} activity={opened.activity} />
+        )}
       </li>
     );
   }
@@ -336,13 +413,17 @@ export function AccountAgreements({ username }: { username: string }) {
               </label>
               <small>
                 The invitation appears in their Logos account for seven days.
-                Email invitations link to Partners. Counts are visible after sign-in.
+                Email invitations link to Partners. Counts are visible after
+                sign-in.
               </small>
               <details>
                 <summary>How reporting works</summary>
-                <small>On a separately enrolled iPhone, Cloudflare Gateway logs blocked requests.
-                  Logos groups retries by domain and keeps the weekly total for 30 days.
-                  Either person can end sharing and remove the stored totals.</small>
+                <small>
+                  On an iPhone using Logos DNS or an enrolled Gateway connection, Logos counts
+                  blocked requests. Logos groups retries by domain and keeps the
+                  weekly total for 30 days. Either person can end sharing and
+                  remove the stored totals.
+                </small>
               </details>
               <label className="consent">
                 <input
@@ -350,8 +431,8 @@ export function AccountAgreements({ username }: { username: string }) {
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
                 />
-                I agree to share weekly grouped counts from my reporting iPhone once
-                they accept.
+                I agree to share weekly grouped counts from my reporting iPhone
+                once they accept.
               </label>
               <button
                 className="primary"

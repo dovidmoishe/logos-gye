@@ -18,7 +18,7 @@ Alternatively, run `docker compose -f infra/compose.yaml up --build`. The dashbo
 
 ## Demo boundaries
 
-Open `/demo` to explore the sample workspace with fictional addresses. Its API persists invitations in a browser-specific workspace identified by an HTTP-only cookie. Recipient decisions are simulated and no email is sent. Device information and report counts are fixtures. The iPhone app continues to verify real DNS behavior locally. The main dashboard uses authenticated accounts and recipient decisions. Open **Partners** for live invitations and **Devices** for pairing.
+Open `/demo` to explore the sample workspace with fictional addresses. Its API persists invitations in a browser-specific workspace identified by an HTTP-only cookie. Recipient decisions are simulated and no email is sent. Device information and report counts are fixtures. The iPhone app continues to verify real DNS behavior locally. The main dashboard uses authenticated accounts and recipient decisions. Open **Partners** for live invitations and **Devices** for signed-in iPhones.
 
 ## Database
 
@@ -50,7 +50,7 @@ When the Mac email-test stack is running, open [the local dashboard](http://127.
 
 ## Account and iPhone pilot
 
-Open **Devices** in the dashboard (`/devices` or `/account`). Sign in with the code sent to your Logos email, name an iPhone, then create a pairing pass. In the app, open **Protection → Dashboard connection**, paste the pass, and connect. **Run and share safe check** sends the latest synthetic DNS check outcome. Refresh the dashboard to see the result and server receipt time. Disconnect removes the device and invalidates its credential.
+Sign in to Logos on the iPhone and on the dashboard with the same account. The iPhone appears under **Devices** automatically. In **Protection**, tap **Run and save safe check** to see the result and its server receipt time on the dashboard. The legacy pairing pass is available for guest apps. Disconnect removes the device until the owner explicitly reconnects it.
 
 The local simulator can reach the dashboard at http://127.0.0.1:3000. A physical phone needs a trusted HTTPS dashboard origin reachable from the phone, with /api proxied to the same API. The default development server is loopback-only. Set COOKIE_SECURE=true when serving through HTTPS. Automatic migrations add the account and device tables. The separate partner demo continues to use its original browser cookie.
 
@@ -62,7 +62,11 @@ The local simulator can reach the dashboard at http://127.0.0.1:3000. A physical
 | GET, POST /api/account/agreements | List agreements or invite a partner email or an existing pilot username under the weekly grouped-count scope. |
 | PATCH /api/account/agreements/:id | Accept or decline as recipient, or revoke as a party to the agreement. |
 | GET /api/account/agreements/:id/report | Read the most recent completed UTC week under a connected agreement. |
+| POST /api/account/devices/connect, POST /api/account/devices/check | Connect a signed-in installation or save its diagnostic result. |
+| PATCH /api/account/agreements/:id/alerts, GET /api/account/agreements/:id/activity | Set your own check-in email preference or read scoped current-week activity. |
 | POST /api/device/pair | Exchange a pass for a device credential. iOS stores it in Keychain. |
 | POST /api/device/checks | Use the device bearer credential to replace its latest check with blocked, open or unknown. |
 
 Only credential digests are persisted on the server. The device endpoint accepts synthetic check outcomes independently of partner reporting. No general browsing activity is uploaded. Partners sign in to review invitations in the dashboard. Invitations appear when the recipient signs in with the invited address. Connected parties can open the weekly report on the dashboard or iPhone. The first eligible week begins on or after acceptance. Missing telemetry is shown as unavailable. The local stack delivers invitation and report-ready emails to Mailpit. A trusted operator can publish a complete, device-scoped Gateway export. The shared Families resolver supplies no export. See [pilot report operations](docs/weekly-reports.md).
+
+Production runs on a single VPS behind Caddy. See the [production deployment guide](infra/production/README.md) for container releases, verification, backups and mail configuration.

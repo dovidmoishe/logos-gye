@@ -1,0 +1,35 @@
+# Private backend. Only the authenticated Logos DNS route is published.
+http:
+  address: 0.0.0.0:3000
+  doh:
+    insecure_enabled: true
+    routes: ["GET /dns-query", "POST /dns-query"]
+users: []
+dns:
+  bind_hosts: [127.0.0.1]
+  port: 5353
+  upstream_dns:
+    - https://security.cloudflare-dns.com/dns-query
+  bootstrap_dns: [1.1.1.1, 1.0.0.1]
+  ratelimit: 0
+querylog:
+  enabled: false
+  file_enabled: false
+statistics:
+  enabled: false
+filtering:
+  protection_enabled: true
+  filtering_enabled: true
+  blocking_mode: null_ip
+  filters_update_interval: 24
+filters:
+  - enabled: true
+    id: 1001
+    name: HaGeZi NSFW
+    url: https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/nsfw.txt
+user_rules:
+  - '||nudity.testcategory.com^'
+log:
+  enabled: true
+  verbose: false
+schema_version: 35

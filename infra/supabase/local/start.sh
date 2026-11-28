@@ -26,6 +26,12 @@ writeFileSync(file+'.tmp', "DB_PASSWORD="+secret()+"\nJWT_SECRET="+secret()+"\nJ
 renameSync(file+'.tmp',file);
 JS
 fi
+if ! grep -q '^PARTNER_GATEWAY_SECRET=' "$directory/keys.env"; then
+  printf '\nPARTNER_GATEWAY_SECRET=%s\n' "$(openssl rand -hex 32)" >> "$directory/keys.env"
+fi
+if ! grep -q '^ADGUARD_DEVICE_SECRET=' "$directory/keys.env"; then
+  printf '\nADGUARD_DEVICE_SECRET=%s\n' "$(openssl rand -hex 32)" >> "$directory/keys.env"
+fi
 export PHONE_ORIGIN="https://$name:54443"
 compose() { docker compose --env-file "$directory/keys.env" -f infra/supabase/local/compose.yaml "$@"; }
 case "${1:-start}" in

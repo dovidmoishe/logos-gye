@@ -65,10 +65,11 @@ export const devices = pgTable(
       mode: "number",
     }).notNull(),
     credentialDigest: text("credential_digest").unique(),
+    installationId: text("installation_id"),
     lastCheck: text("last_check"),
     checkedAt: bigint("checked_at", { mode: "number" }),
   },
-  (d) => [index("devices_owner_idx").on(d.owner)],
+  (d) => [index("devices_owner_idx").on(d.owner), uniqueIndex("devices_owner_installation").on(d.owner, d.installationId)],
 );
 
 export const agreements = pgTable(
@@ -84,6 +85,9 @@ export const agreements = pgTable(
     }),
     status: partnerStatus("status").notNull(),
     scope: text("scope").notNull(),
+    ownerAlertsAt: bigint("owner_alerts_at", { mode: "number" }),
+    partnerAlertsAt: bigint("partner_alerts_at", { mode: "number" }),
+    lastAlertAt: bigint("last_alert_at", { mode: "number" }),
     acceptedAt: bigint("accepted_at", { mode: "number" }),
     createdAt: bigint("created_at", { mode: "number" }).notNull(),
     expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
@@ -124,10 +128,33 @@ export const reportingSources = pgTable("agreement_reporting_sources", {
   adultPolicy: text("adult_policy").notNull(),
 });
 
-export const partnerMail = pgTable("partner_mail", {
-  agreementId: text("agreement_id").notNull().references(() => agreements.id, { onDelete: "cascade" }),
-  // Zero denotes the invitation. A report uses its UTC week start.
-  period: bigint("period", { mode: "number" }).notNull(),
-  nextAttempt: bigint("next_attempt", { mode: "number" }).notNull(),
-  attempts: integer("attempts").notNull().default(0),
-}, (row) => [primaryKey({ columns: [row.agreementId, row.period] }), index("partner_mail_due").on(row.nextAttempt)]);
+export const partnerMail = pgTable(
+  "partner_mail",
+  {
+    agreementId: text("agreement_id")
+      .notNull()
+      .references(() => agreements.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull().default("weekly"),
+    period: bigint("period", { mode: "number" }).notNull(),
+    nextAttempt: bigint("next_attempt", { mode: "number" }).notNull(),
+    attempts: integer("attempts").notNull().default(0),
+  },
+  (row) => [
+    primaryKey({ columns: [row.agreementId, row.kind, row.period] }),
+    index("partner_mail_due").on(row.nextAttempt),
+  ],
+);
+
+export const liveBlocks = pgTable(
+  "agreement_live_blocks",
+  {
+    agreementId: text("agreement_id")
+      .notNull()
+      .references(() => reportingSources.agreementId, { onDelete: "cascade" }),
+    domainKey: text("domain_key").notNull(),
+    occurredAt: bigint("occurred_at", { mode: "number" }).notNull(),
+  },
+  (row) => [
+    primaryKey({ columns: [row.agreementId, row.domainKey, row.occurredAt] }),
+  ],
+);

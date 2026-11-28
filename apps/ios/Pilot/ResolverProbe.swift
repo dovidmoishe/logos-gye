@@ -34,6 +34,25 @@ enum ResolverProbe {
         return addresses
     }
 
+    static func verifyEndpoint(_ endpoint: URL) async throws {
+        // Request the known harmless A record before replacing a working DNS profile.
+        var message = Data([0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0])
+        for label in ["nudity", "testcategory", "com"] {
+            message.append(UInt8(label.utf8.count))
+            message.append(contentsOf: label.utf8)
+        }
+        message.append(contentsOf: [0, 0, 1, 0, 1])
+        var request = URLRequest(url: endpoint, timeoutInterval: 6)
+        request.httpMethod = "POST"
+        request.setValue("application/dns-message", forHTTPHeaderField: "Content-Type")
+        request.httpBody = message
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200, response.mimeType == "application/dns-message",
+              data.count >= message.count + 16, data[0] == 0, data[1] == 1, data[2] & 0x80 != 0,
+              data[3] & 0x0f == 0, data[6] == 0, data[7] == 1,
+              data.suffix(6).elementsEqual([0, 4, 0, 0, 0, 0]) else { throw URLError(.badServerResponse) }
+    }
+
     static func run() -> ProbeResult {
         .evaluate(control: addresses(for: "example.com"), category: addresses(for: "nudity.testcategory.com"))
     }

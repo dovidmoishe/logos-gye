@@ -1,0 +1,6 @@
+[Unit]
+Description=Back up the Logos production database
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/opt/logos/infra/production/backup.sh

@@ -46,6 +46,16 @@ services:
       GOTRUE_MAILER_SUBJECTS_CONFIRMATION: Your Logos sign-in code
       GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: http://gateway:8080/email-code.html
       GOTRUE_MAILER_TEMPLATES_CONFIRMATION: http://gateway:8080/email-code.html
+  adguard:
+    image: adguard/adguardhome:v1.0.0
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        cp /etc/logos/AdGuardHome.yaml /opt/adguardhome/conf/AdGuardHome.yaml
+        exec /opt/adguardhome/AdGuardHome --no-check-update -c /opt/adguardhome/conf/AdGuardHome.yaml -w /opt/adguardhome/work
+    volumes:
+      - ../../adguard/AdGuardHome.yaml:/etc/logos/AdGuardHome.yaml:ro
+      - adguard-work:/opt/adguardhome/work
   api:
     build:
       context: ../../..
@@ -56,6 +66,10 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://logos:${DB_PASSWORD}@db:5432/logos
+      ADGUARD_INTERNAL_ORIGIN: http://adguard:3000
+      ADGUARD_PUBLIC_ORIGIN: ${ADGUARD_PUBLIC_ORIGIN:-https://localhost:54443}
+      ADGUARD_DEVICE_SECRET: ${ADGUARD_DEVICE_SECRET:-}
+      PARTNER_GATEWAY_SECRET: ${PARTNER_GATEWAY_SECRET:-}
       PARTNER_EXPORT_DIR: /report-exports
       PARTNER_SMTP_URL: smtp://mail:1025
       PARTNER_MAIL_FROM: partners@logos.test
@@ -93,3 +107,4 @@ services:
       - ../../../.data/local-auth/tls:/etc/nginx/logos:ro
 volumes:
   data:
+  adguard-work:

@@ -96,6 +96,7 @@ struct PilotHome: View {
         .font(.custom("Satoshi-Regular", size: 17, relativeTo: .body))
         .tint(PilotTheme.lilac)
         .environmentObject(reader)
+        .task(id: reader.owner) { try? await reader.connectPhone() }
         .preferredColorScheme(dark ? .dark : .light)
     }
 
@@ -206,7 +207,7 @@ private struct WelcomeFlow: View {
     private let details = [
         "Block adult sites. Take a daily pause.",
         "What kind of encouragement would you like?",
-        "When the filter is on, Cloudflare for Families receives DNS requests. Check-ins stay on this phone. Partner reports require your agreement."
+        "Your selected DNS provider receives requests to filter domains. Check-ins stay on this phone. Partner reports require your agreement."
     ]
 
     var body: some View {

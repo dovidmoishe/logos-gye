@@ -1,0 +1,28 @@
+{
+	log {
+		format filter {
+			request>uri delete
+			request>headers delete
+		}
+	}
+}
+
+withlogos.app {
+	redir https://app.withlogos.app{uri} permanent
+}
+
+app.withlogos.app {
+	handle /api/* {
+		reverse_proxy api:3001
+	}
+	handle {
+		reverse_proxy dashboard:3000
+	}
+}
+
+dns.withlogos.app {
+	handle /dns-query/* {
+		reverse_proxy api:3001
+	}
+	respond 404
+}

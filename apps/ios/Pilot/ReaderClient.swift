@@ -125,6 +125,7 @@ final class ReaderTransport: NSObject, URLSessionTaskDelegate {
     private let authOrigin = HostedAuthConfiguration.project.absoluteString + "/auth/v1/"
     private let publicKey = "sb_publishable_1DAJK7QWBhBtEEDDe5DVGw_tXQMrdJ9"
     @Published private var session: HostedSession?
+    @Published private(set) var resolverURL: URL?
     @Published var resume: ReadingVerse?
     @Published var live: Bool
     private var refreshing: Task<HostedSession, Error>?
@@ -217,6 +218,18 @@ final class ReaderTransport: NSObject, URLSessionTaskDelegate {
     }
     func signOut() async throws {
         let old = session
+        #if !targetEnvironment(simulator)
+        if UserDefaults.standard.bool(forKey: "logos.accountDNSInstalled") {
+            let manager = NEDNSSettingsManager.shared()
+            try await manager.loadFromPreferences()
+            if manager.dnsSettings != nil {
+                manager.dnsSettings = ProtectionView.familiesDNS()
+                try await manager.saveToPreferences()
+            }
+            UserDefaults.standard.removeObject(forKey: "logos.accountDNSInstalled")
+        }
+        #endif
+        resolverURL = nil
         refreshing?.cancel()
         refreshing = nil
         try SessionKeychain.save(nil)
@@ -245,6 +258,47 @@ final class ReaderTransport: NSObject, URLSessionTaskDelegate {
         try await apiRequest("reading/" + path, method: body == nil ? "GET" : "POST", body: body, personal: personal)
     }
 
+    private var installationKey: String {
+        "logos.installation." + (Self.apiOrigin?.absoluteString ?? "") + "." + owner + "." + (UIDevice.current.identifierForVendor?.uuidString ?? "local")
+    }
+    private func installationID() -> String {
+        if let value = UserDefaults.standard.string(forKey: installationKey) { return value }
+        let id = UUID().uuidString.lowercased()
+        UserDefaults.standard.set(id, forKey: installationKey)
+        return id
+    }
+
+    func connectPhone(reconnect: Bool = false) async throws {
+        guard email != nil else { return }
+        let key = installationKey + ".connected"
+        var body: [String: Any] = ["installation": installationID(), "create": reconnect || !UserDefaults.standard.bool(forKey: key)]
+        if let previous = previousDeviceCredential(for: Self.apiOrigin) { body["previous"] = previous }
+        let identity = owner
+        struct Connected: Decodable { let id: String; let resolverURL: URL? }
+        let device: Connected = try await apiRequest("account/devices/connect", method:"POST", body:body, personal:true)
+        guard identity == owner else { throw CancellationError() }
+        // In the Mac-only stack, localhost points at the Mac, not this iPhone.
+        if let url = device.resolverURL, url.scheme == "https", let host = url.host,
+           !["localhost", "127.0.0.1", "::1", "[::1]"].contains(host.lowercased()) {
+            resolverURL = url
+        } else { resolverURL = nil }
+        UserDefaults.standard.set(true, forKey:key)
+    }
+    func saveDeviceCheck(_ result: ProbeResult) async throws {
+        let identity = owner
+        try await connectPhone()
+        guard owner == identity else { throw CancellationError() }
+        let outcome: String
+        switch result { case .blocked: outcome = "blocked"; case .open: outcome = "open"; case .unknown: outcome = "unknown" }
+        struct Saved: Decodable { let checkedAt: Double }
+        let _: Saved = try await apiRequest("account/devices/check", method:"POST", body:["installation":installationID(),"outcome":outcome],personal:true)
+    }
+    func setAlerts(for agreement: PartnerAgreement, enabled: Bool) async throws -> [PartnerAgreement] {
+        try await apiRequest("account/agreements/" + agreement.id.uuidString.lowercased() + "/alerts", method:"PATCH", body:["enabled":enabled],personal:true)
+    }
+    func activity(for agreement: PartnerAgreement) async throws -> PartnerActivity {
+        try await apiRequest("account/agreements/" + agreement.id.uuidString.lowercased() + "/activity",method:"GET",body:nil,personal:true)
+    }
     func agreements() async throws -> [PartnerAgreement] {
         try await apiRequest("account/agreements", method: "GET", body: nil, personal: true)
     }

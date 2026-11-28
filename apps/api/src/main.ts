@@ -1,6 +1,8 @@
 import "reflect-metadata";
 import { readFileSync } from "node:fs";
 import type { NestApplicationOptions } from "@nestjs/common";
+import { adguardResolver } from "./reporting/adguard";
+import { gatewayReceiver } from "./reporting/live";
 import { PartnerReportWorker } from "./reporting/mail";
 import { Agreements, AgreementsController } from "./agreements";
 import {
@@ -84,6 +86,8 @@ class AppModule {}
 export async function createApp(options: NestApplicationOptions = {}) {
   const app = await NestFactory.create(AppModule, options);
   app.enableShutdownHooks();
+  app.use("/dns-query", adguardResolver(app.get(Database)));
+  app.use("/api/reporting/gateway", gatewayReceiver(app.get(Database)));
   app.use(cookieParser());
   app.use(
     ["/api/account/login", "/api/account/register", "/api/device/pair"],

@@ -15,7 +15,7 @@ import {
   Res,
   UnauthorizedException,
 } from "@nestjs/common";
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import {
   createHash,
   randomBytes,
@@ -27,6 +27,7 @@ import { AuthService } from "./reading/auth/auth.service";
 import { promisify } from "node:util";
 import type { Request, Response } from "express";
 import { Database } from "./db/connection";
+import { deviceResolver } from "./reporting/adguard";
 import { accounts, devices, sessions } from "./db/schema";
 
 const hashPassword = promisify(scrypt);
@@ -66,7 +67,10 @@ function credentials(input: unknown) {
 }
 @Injectable()
 export class AccountService {
-  constructor(private readonly database: Database, private readonly hostedAuth: AuthService) {}
+  constructor(
+    private readonly database: Database,
+    private readonly hostedAuth: AuthService,
+  ) {}
   private get db() {
     return this.database.db;
   }
@@ -90,13 +94,11 @@ export class AccountService {
           .returning({ id: accounts.id });
         if (!inserted.length)
           throw new ConflictException("Username unavailable.");
-        await tx
-          .insert(sessions)
-          .values({
-            owner,
-            digest: digest(secret),
-            expiresAt: Date.now() + lifetime,
-          });
+        await tx.insert(sessions).values({
+          owner,
+          digest: digest(secret),
+          expiresAt: Date.now() + lifetime,
+        });
       });
       return { username, secret };
     } else {
@@ -112,18 +114,19 @@ export class AccountService {
         throw new UnauthorizedException("Incorrect username or password.");
       owner = account.id;
     }
-    await this.db
-      .insert(sessions)
-      .values({
-        owner,
-        digest: digest(secret),
-        expiresAt: Date.now() + lifetime,
-      });
+    await this.db.insert(sessions).values({
+      owner,
+      digest: digest(secret),
+      expiresAt: Date.now() + lifetime,
+    });
     return { username, secret };
   }
   async owner(req: Request) {
     if (req.headers.authorization) {
-      const { id: subject, email } = await this.hostedAuth.authenticateBearerToken(req.headers.authorization);
+      const { id: subject, email } =
+        await this.hostedAuth.authenticateBearerToken(
+          req.headers.authorization,
+        );
       return { id: "supabase:" + subject, username: email.toLowerCase() };
     }
     const secret = req.cookies.logos_session;
@@ -147,18 +150,100 @@ export class AccountService {
   }
   async inventory(owner: string) {
     const rows = await this.db
-      .select({ ...deviceFields, paired: devices.credentialDigest })
+      .select({
+        ...deviceFields,
+        paired: devices.credentialDigest,
+        installation: devices.installationId,
+      })
       .from(devices)
       .where(eq(devices.owner, owner))
       .orderBy(desc(devices.pairingExpiresAt));
-    return rows.map(({ paired, ...row }) => ({
+    return rows.map(({ paired, installation, ...row }) => ({
       ...row,
-      state: paired
-        ? "paired"
-        : row.pairingExpiresAt > Date.now()
-          ? "pending"
-          : "expired",
+      state:
+        paired || installation
+          ? "paired"
+          : row.pairingExpiresAt > Date.now()
+            ? "pending"
+            : "expired",
     }));
+  }
+  async connectInstallation(
+    owner: string,
+    installation: unknown,
+    create: unknown,
+    previous: unknown,
+  ) {
+    if (
+      typeof installation !== "string" ||
+      !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(installation) ||
+      typeof create !== "boolean"
+    )
+      throw new BadRequestException("Invalid installation.");
+    const match = and(
+      eq(devices.owner, owner),
+      eq(devices.installationId, installation),
+    );
+    return this.db.transaction(async (tx) => {
+      await tx
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(eq(accounts.id, owner))
+        .for("update");
+      const [existing] = await tx
+        .select({ id: devices.id })
+        .from(devices)
+        .where(match);
+      if (existing) return existing;
+      if (!create) throw new NotFoundException("This iPhone was disconnected.");
+      if (typeof previous === "string" && previous.length === 43) {
+        const [legacy] = await tx
+          .update(devices)
+          .set({ installationId: installation })
+          .where(
+            and(
+              eq(devices.owner, owner),
+              eq(devices.credentialDigest, digest(previous)),
+              isNull(devices.installationId),
+            ),
+          )
+          .returning({ id: devices.id });
+        if (legacy) return legacy;
+      }
+      const [added] = await tx
+        .insert(devices)
+        .values({
+          id: randomUUID(),
+          owner,
+          name: "iPhone",
+          installationId: installation,
+          pairingExpiresAt: Date.now(),
+        })
+        .returning({ id: devices.id });
+      return added;
+    });
+  }
+
+  async checkInstallation(
+    owner: string,
+    installation: unknown,
+    outcome: unknown,
+  ) {
+    if (
+      typeof installation !== "string" ||
+      typeof outcome !== "string" ||
+      !["blocked", "open", "unknown"].includes(outcome)
+    )
+      throw new BadRequestException("Invalid device check.");
+    const [saved] = await this.db
+      .update(devices)
+      .set({ lastCheck: outcome, checkedAt: Date.now() })
+      .where(
+        and(eq(devices.owner, owner), eq(devices.installationId, installation)),
+      )
+      .returning({ checkedAt: devices.checkedAt });
+    if (!saved) throw new NotFoundException("This iPhone was disconnected.");
+    return saved;
   }
   async enroll(owner: string, name: unknown) {
     if (typeof name !== "string" || !name.trim() || name.trim().length > 80)
@@ -166,15 +251,13 @@ export class AccountService {
     const code = token(),
       id = randomUUID(),
       expiresAt = Date.now() + 600000;
-    await this.db
-      .insert(devices)
-      .values({
-        id,
-        owner,
-        name: name.trim(),
-        pairingDigest: digest(code),
-        pairingExpiresAt: expiresAt,
-      });
+    await this.db.insert(devices).values({
+      id,
+      owner,
+      name: name.trim(),
+      pairingDigest: digest(code),
+      pairingExpiresAt: expiresAt,
+    });
     return { id, code, expiresAt };
   }
   async pair(code: unknown) {
@@ -255,23 +338,39 @@ export class AccountController {
       devices: await this.service.inventory(owner.id),
     };
   }
+  @Post("devices/connect") async connect(
+    @Req() req: Request,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const device = await this.service.connectInstallation(
+      (await this.service.owner(req)).id,
+      body.installation,
+      body.create,
+      body.previous,
+    );
+    return { ...device, resolverURL: deviceResolver(device.id) };
+  }
+  @Post("devices/check") async check(
+    @Req() req: Request,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.service.checkInstallation(
+      (await this.service.owner(req)).id,
+      body.installation,
+      body.outcome,
+    );
+  }
   @Post("devices") async enroll(
     @Req() req: Request,
     @Body("name") name: unknown,
   ) {
-    return this.service.enroll(
-      (await this.service.owner(req)).id,
-      name,
-    );
+    return this.service.enroll((await this.service.owner(req)).id, name);
   }
   @Delete("devices/:id") @HttpCode(204) async remove(
     @Req() req: Request,
     @Param("id") id: string,
   ) {
-    await this.service.remove(
-      (await this.service.owner(req)).id,
-      id,
-    );
+    await this.service.remove((await this.service.owner(req)).id, id);
   }
 }
 @Controller("api/device")

@@ -12,7 +12,7 @@ Open **Read** for live Scripture. If you previously chose the offline sample, ta
 
 For a physical Debug build, run `infra/dev-reader-mac.sh` from the repository root, then build the Logos scheme. This starts Nest on port 3443, creates a local development certificate and writes the Mac hostname and certificate fingerprint into the Debug configuration. Keep the Mac and phone on the same Wi-Fi and allow local network access when prompted. For a release build, set LOGOS_READER_API to the deployed HTTPS API origin. A simulator can use a local API on port 3001.
 
-**Protection** shows the DNS configuration and timestamped safe-check result. The setup screen explains the resolver before requesting approval. Results stay local unless the owner pairs their device and selects **Run and share safe check** under **Dashboard connection**. **Accountability partner** lets a signed-in reader invite someone, review the scope, respond to invitations, open a connected agreement’s weekly report, or revoke access. Guests can preview the report.
+**Protection** shows the DNS configuration and timestamped safe-check result. The setup screen explains the resolver before requesting approval. Signed-in phones connect to the account automatically. **Run and save safe check** saves the outcome to Devices. Guest users can still use an existing dashboard pairing. **Accountability partner** lets a signed-in reader invite someone, review the scope, respond to invitations, open a connected agreement’s weekly report, or revoke access. Guests can preview the report.
 
 Urbanist SemiBold is bundled under the SIL Open Font License. On the first build per DerivedData configuration, Xcode downloads unmodified Satoshi Regular from Fontshare for app embedding, then caches it. Both license texts ship with the app.
 
@@ -76,3 +76,7 @@ Generation prompt:
 The journal illustration in the WelcomeJournal asset set was created with built-in ImageGen from the supplied style reference. Prompt:
 
 > Style reference only. Create a single original landscape 3:2 transparent-background cutout illustration for a mindful iPhone app: an open pocket journal with two check marks, a lavender bookmark, a pencil, and a tiny sprouting plant in a cup. Strong black ink silhouettes, white paper planes, bold offset hard shadows, editorial flat vector-like artwork. Cluster the overlapping objects in a lively diagonal composition, generous clear margin, legible at 300px. No text, interface, buttons, borders, gray backdrop or screenshot.
+
+### Screen Time shield
+
+Under Protection, choose **Enable Screen Time shield**, approve individual authorization, then choose apps, websites or categories using Apple's picker. Open a selection to see the Logos pause screen. Clear the selections in Protection to remove those shields. Selections stay on the phone. Screen Time handles shielding independently of the active DNS provider. App Store or TestFlight builds require the distribution Family Controls entitlement for the app and the LogosShield extension.

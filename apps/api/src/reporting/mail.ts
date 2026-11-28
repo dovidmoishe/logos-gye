@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { join } from "node:path";
 import { access } from "node:fs/promises";
+import { alertCooldown } from "./live";
 import { importWeek } from "./gateway";
 import nodemailer from "nodemailer";
 import { Database } from "../db/connection";
@@ -76,8 +77,12 @@ export class PartnerReportWorker
         [week, now - 30 * day],
       );
       await this.database.pool.query(
-        "delete from partner_mail j using account_agreements a where a.id=j.agreement_id and ((j.period=0 and (a.status<>'Pending' or a.expires_at <= $1)) or (j.period>0 and (a.status<>'Connected' or j.period < $2)))",
-        [now, monday(now) - week],
+        "delete from partner_mail j using account_agreements a where a.id=j.agreement_id and ((j.kind='invitation' and (a.status<>'Pending' or a.expires_at <= $1)) or (j.kind='weekly' and (a.status<>'Connected' or j.period < $2)) or (j.kind='check-in' and j.period <= $3))",
+        [now, monday(now) - week, now - alertCooldown],
+      );
+      await this.database.pool.query(
+        "delete from agreement_live_blocks where occurred_at < $1",
+        [monday(now)],
       );
       this.nextCleanup = now + 3600000;
     }
@@ -125,7 +130,8 @@ export class PartnerReportWorker
         rows: [job],
       } = await client.query(
         `
-        select j.agreement_id, j.period, j.attempts, a.invite_address, a.status, a.scope, a.expires_at,
+        select j.agreement_id, j.kind, j.period, j.attempts, a.owner_alerts_at, a.partner_alerts_at,
+               exists(select 1 from agreement_reporting_sources s where s.agreement_id=a.id and s.registered_at<=j.period) as bound, a.invite_address, a.status, a.scope, a.expires_at,
                exists(select 1 from agreement_weekly_reports r where r.agreement_id=j.agreement_id and r.week_start=j.period) as ready
         from partner_mail j join account_agreements a on a.id=j.agreement_id
         where j.next_attempt <= $1 order by j.next_attempt limit 1 for update of a,j skip locked`,
@@ -136,29 +142,43 @@ export class PartnerReportWorker
         return false;
       }
       const period = Number(job.period);
-      const invitation = period === 0;
+      const invitation = job.kind === "invitation";
+      const checkIn = job.kind === "check-in";
       const eligible =
         job.scope === reportScope &&
         isMailbox(job.invite_address) &&
         (invitation
           ? job.status === "Pending" && Number(job.expires_at) > now
-          : job.status === "Connected" &&
-            job.ready &&
-            period === monday(now) - week);
-      const key = [job.agreement_id, period];
+          : checkIn
+            ? job.status === "Connected" &&
+              job.bound &&
+              job.owner_alerts_at != null &&
+              job.partner_alerts_at != null &&
+              Number(job.owner_alerts_at) <= period &&
+              Number(job.partner_alerts_at) <= period &&
+              now - period < alertCooldown
+            : job.kind === "weekly" &&
+              job.status === "Connected" &&
+              job.ready &&
+              period === monday(now) - week);
+      const key = [job.agreement_id, period, job.kind];
       if (eligible) {
         try {
           await this.transport!.sendMail({
             from: process.env.PARTNER_MAIL_FROM,
             to: { name: "", address: job.invite_address },
-            messageId: `<${job.agreement_id}.${period}@logos.notifications>`,
+            messageId: `<${job.agreement_id}.${period}${checkIn ? ".check-in" : ""}@logos.notifications>`,
             subject: invitation
               ? "You have a Logos invitation"
-              : "Your Logos weekly report is ready",
+              : checkIn
+                ? "Could you check in?"
+                : "Your Logos weekly report is ready",
             text:
               (invitation
                 ? "Sign in with this email address to review your invitation."
-                : "Sign in to view your weekly report.") +
+                : checkIn
+                  ? "You and your Logos partner asked for a heads-up after a filter block. A quick, kind message might help. Sign in to see your agreement."
+                  : "Sign in to view your weekly report.") +
               "\n\n" +
               this.link,
           });
@@ -168,7 +188,7 @@ export class PartnerReportWorker
             30000 * 2 ** Math.min(job.attempts, 7),
           );
           await client.query(
-            "update partner_mail set attempts=attempts+1, next_attempt=$3 where agreement_id=$1 and period=$2",
+            "update partner_mail set attempts=attempts+1, next_attempt=$4 where agreement_id=$1 and period=$2 and kind=$3",
             [...key, now + delay],
           );
           await client.query("commit");
@@ -180,7 +200,7 @@ export class PartnerReportWorker
         }
       }
       await client.query(
-        "delete from partner_mail where agreement_id=$1 and period=$2",
+        "delete from partner_mail where agreement_id=$1 and period=$2 and kind=$3",
         key,
       );
       await client.query("commit");

@@ -68,6 +68,8 @@ export class Agreements {
         owner: owner.username,
         recipient: sql<string>`coalesce(${recipient.username}, ${agreements.inviteAddress})`,
         createdAt: agreements.createdAt,
+        ownerAlerts: sql<boolean>`${agreements.ownerAlertsAt} is not null`,
+        partnerAlerts: sql<boolean>`${agreements.partnerAlertsAt} is not null`,
         status: agreements.status,
         scope: agreements.scope,
         expiresAt: agreements.expiresAt,
@@ -135,10 +137,88 @@ export class Agreements {
       if (isMailbox(address)) {
         await tx
           .insert(partnerMail)
-          .values({ agreementId: created.id, period: 0, nextAttempt: now });
+          .values({
+            agreementId: created.id,
+            kind: "invitation",
+            period: 0,
+            nextAttempt: now,
+          });
       }
     });
     return this.list(user);
+  }
+  async setAlerts(user: Party, id: string, enabled: unknown) {
+    if (typeof enabled !== "boolean")
+      throw new BadRequestException("Choose a check-in email preference.");
+    await this.db.transaction(async (tx) => {
+      const [a] = await tx
+        .select()
+        .from(agreements)
+        .where(
+          and(
+            eq(agreements.id, id),
+            eq(agreements.status, "Connected"),
+            eq(agreements.scope, scope),
+            or(
+              eq(agreements.owner, user.id),
+              eq(agreements.recipient, user.id),
+            ),
+          ),
+        )
+        .for("update");
+      if (!a) throw new NotFoundException("Agreement unavailable.");
+      if (enabled && !isMailbox(a.inviteAddress))
+        throw new BadRequestException(
+          "An email address is required for check-in emails.",
+        );
+      const field = a.owner === user.id ? "ownerAlertsAt" : "partnerAlertsAt";
+      if (Boolean(a[field]) === enabled) return;
+      await tx
+        .update(agreements)
+        .set({ [field]: enabled ? Date.now() : null })
+        .where(eq(agreements.id, id));
+      if (!enabled) {
+        await tx
+          .delete(partnerMail)
+          .where(
+            and(
+              eq(partnerMail.agreementId, id),
+              eq(partnerMail.kind, "check-in"),
+            ),
+          );
+      }
+    });
+    return this.list(user);
+  }
+
+  async liveReport(user: Party, id: string) {
+    const start = monday(Date.now());
+    const {
+      rows: [row],
+    } = await this.database.pool.query(
+      `
+      select (a.owner=$2 or (a.owner_alerts_at is not null and a.partner_alerts_at is not null)) as enabled,
+        s.agreement_id is not null as bound,
+        (select count(*)::int from (
+          select occurred_at - lag(occurred_at) over(partition by domain_key order by occurred_at) as gap
+          from agreement_live_blocks where agreement_id=a.id and occurred_at >= $3
+            and (a.owner=$2 or (occurred_at>=a.owner_alerts_at and occurred_at>=a.partner_alerts_at))
+        ) events where gap is null or gap>300000) as groups
+      from account_agreements a left join agreement_reporting_sources s on s.agreement_id=a.id
+      where a.id=$1 and (a.owner=$2 or a.recipient=$2) and a.status='Connected' and a.scope=$4`,
+      [id, user.id, start, scope],
+    );
+    if (!row) throw new NotFoundException("Agreement unavailable.");
+    if (!row.enabled) return { status: "off", groupedRequests: null };
+    // Missing observations are unknown until the source supplies a covered week.
+    return {
+      status: row.groups
+        ? "observed"
+        : row.bound
+          ? "awaiting_events"
+          : "awaiting_source",
+      groupedRequests: row.groups || null,
+    };
   }
   async weeklyReport(user: Party, id: string) {
     const currentMonday = monday(Date.now());
@@ -255,6 +335,23 @@ export class AgreementsController {
   ) {}
   @Get() async list(@Req() req: Request) {
     return this.agreements.list(await this.accounts.owner(req));
+  }
+  @Patch(":id/alerts") async alerts(
+    @Req() req: Request,
+    @Param("id") id: string,
+    @Body("enabled") enabled: unknown,
+  ) {
+    return this.agreements.setAlerts(
+      await this.accounts.owner(req),
+      id,
+      enabled,
+    );
+  }
+  @Get(":id/activity") async activity(
+    @Req() req: Request,
+    @Param("id") id: string,
+  ) {
+    return this.agreements.liveReport(await this.accounts.owner(req), id);
   }
   @Get(":id/report") async report(
     @Req() req: Request,

@@ -59,6 +59,14 @@ private enum DeviceTransport {
     }
 }
 
+@MainActor
+func previousDeviceCredential(for origin: URL?) -> String? {
+    guard let device = try? DeviceKeychain.load(), let origin,
+          device.origin.scheme == origin.scheme, device.origin.host == origin.host,
+          device.origin.port == origin.port else { return nil }
+    return device.credential
+}
+
 struct DashboardConnection: View {
     @State private var device: PairedDevice?
     @State private var pass = ""
@@ -137,6 +145,8 @@ struct PartnerAgreement: Decodable, Identifiable {
     let owner: String
     let status: String
     let expiresAt: Double
+    let ownerAlerts: Bool?
+    let partnerAlerts: Bool?
 }
 
 struct PartnerInformation: View {
@@ -169,6 +179,14 @@ struct PartnerInformation: View {
                                 Text("Expires " + Date(timeIntervalSince1970: row.expiresAt / 1000).formatted(date: .abbreviated, time: .omitted)).font(.caption)
                             }
                             if row.status == "Connected" {
+                                let approved = (outgoing ? row.ownerAlerts : row.partnerAlerts) == true
+                                let otherApproved = (outgoing ? row.partnerAlerts : row.ownerAlerts) == true
+                                if row.recipient.contains("@") {
+                                    Toggle("Check-in emails", isOn: Binding(get: { approved }, set: { enabled in
+                                        Task { _ = await update { try await account.setAlerts(for: row, enabled: enabled) } }
+                                    }))
+                                    Text(approved && otherApproved ? "Both agreed. A filter block can prompt one email per hour." : "When both agree, share this week’s observed count and email the partner after a filter block.").font(.footnote)
+                                }
                                 NavigationLink("View weekly report") { PartnerWeekView(agreement: row) }
                             }
                             if row.status == "Pending" && !outgoing {
@@ -205,7 +223,7 @@ struct PartnerInformation: View {
                     }.disabled(!consent || recipient.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     Button("Cancel") { adding = false; recipient = ""; consent = false }
                     DisclosureGroup("How reporting works") {
-                        Text("On a separately enrolled iPhone, Cloudflare Gateway logs blocked requests. Logos groups retries by domain and keeps the weekly total for 30 days. Either person can end sharing and remove the stored totals.")
+                        Text("An iPhone using Logos DNS or an enrolled Gateway connection can report adult-domain blocks. Logos groups retries by domain and keeps the weekly total for 30 days. Either person can end sharing and remove the stored totals.")
                     }
                 }.disabled(busy)
             }
@@ -260,6 +278,17 @@ struct PartnerInformation: View {
     }
 }
 
+struct PartnerActivity: Decodable {
+    let status: String
+    let groupedRequests: Int?
+    var description: String {
+        switch status {
+        case "observed": return "Grouped requests observed: " + String(groupedRequests ?? 0)
+        case "awaiting_source": return "Activity reporting hasn’t been connected for this iPhone yet."
+        default: return "Waiting for the first reported block."
+        }
+    }
+}
 struct PartnerWeek: Decodable {
     enum Status: String, Decodable { case available, unavailable, awaitingFirstWeek = "awaiting_first_week" }
     let status: Status
@@ -272,11 +301,15 @@ private struct PartnerWeekView: View {
     let agreement: PartnerAgreement
     @EnvironmentObject private var account: ReaderAccount
     @Environment(\.scenePhase) private var phase
+    @State private var activity: PartnerActivity?
     @State private var report: PartnerWeek?
     @State private var error: String?
 
     var body: some View {
         List {
+            if let activity, activity.status != "off" {
+                Section("This week so far") { Text(activity.description) }
+            }
             if let report {
                 let utc = Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: TimeZone(secondsFromGMT: 0)!)
                 Section("Reporting week · UTC") {
@@ -297,13 +330,17 @@ private struct PartnerWeekView: View {
         }
         .screenTitle("Weekly report")
         .task(id: phase) {
-            report = nil; error = nil
+            report = nil; activity = nil; error = nil
             guard phase == .active else { return }
             do {
                 let result = try await account.weeklyReport(for: agreement)
                 try Task.checkCancellation()
                 report = result
-            } catch { if !Task.isCancelled { self.error = error.localizedDescription } }
+                while !Task.isCancelled {
+                    activity = try await account.activity(for: agreement)
+                    try await Task.sleep(for: .seconds(15))
+                }
+            } catch { if !Task.isCancelled { report = nil; activity = nil; self.error = error.localizedDescription } }
         }
     }
 }
