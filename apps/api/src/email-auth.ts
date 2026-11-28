@@ -45,6 +45,11 @@ export class SignInMail {
       to: email,
       subject: "Your Logos sign-in code",
       text: `Your Logos sign-in code:\n\n${code}\n\nIt expires in 10 minutes. If you didn’t request it, you can ignore this email.`,
+      html: [
+        "<p>Your Logos sign-in code</p>",
+        `<p style="font-size:28px;font-weight:bold;letter-spacing:3px">${code}</p>`,
+        "<p>It expires in 10 minutes. If you didn’t request it, you can ignore this email.</p>",
+      ].join(""),
     };
     try {
       if (!from) throw Error();

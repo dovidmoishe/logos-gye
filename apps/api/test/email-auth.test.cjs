@@ -26,6 +26,8 @@ test("email sign-in delivers through Senviok and issues revocable web and phone 
       "Bearer test-only",
     );
     code = message.text.match(/\b\d{8}\b/)[0];
+    assert.match(message.html, new RegExp(`>${code}<`));
+    assert.match(message.html, /expires in 10 minutes/);
     return Response.json({ id: "test-receipt" });
   });
   t.after(async () => {

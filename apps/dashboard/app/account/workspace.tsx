@@ -83,7 +83,9 @@ export function AccountWorkspace({ section }: { section: Section }) {
     setError("");
   }
   async function sendCode(address: string) {
-    const { data } = await emailAuthAPI.post<{ challenge: string }>("/otp", { email: address });
+    const { data } = await emailAuthAPI.post<{ challenge: string }>(
+      "/otp", { email: address }, { timeout: 30000 },
+    );
     challenge.current = data.challenge;
     setSentTo(address);
     setCode("");
