@@ -1,4 +1,4 @@
-import Dashboard from "./workspace";
+import { AccountWorkspace } from "./account/workspace";
 export default function Page() {
-  return <Dashboard section="overview" />;
+  return <AccountWorkspace section="overview" />;
 }

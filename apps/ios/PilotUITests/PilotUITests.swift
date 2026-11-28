@@ -71,10 +71,28 @@ final class PilotUITests: XCTestCase {
             app.buttons["Continue"].tap()
             app.buttons["Finish introduction"].tap()
         }
-        let fromIntroduction = app.textFields["Email"].exists
+        let fromIntroduction = app.textFields["Email"].waitForExistence(timeout: 3)
         if !fromIntroduction {
+            #if targetEnvironment(simulator)
+            if !app.tabBars.buttons["Read"].exists {
+                app.terminate()
+                app.launchArguments = ["-reader.live", "YES", "-homeIntroductionComplete", "YES"]
+                app.launch()
+            }
+            #endif
             app.tabBars.buttons["Read"].tap()
             app.buttons["Reader options"].tap()
+            #if targetEnvironment(simulator)
+            if useInbox && !app.buttons["Sign in to Logos"].exists {
+                // A previously interrupted run may still have its synthetic account signed in.
+                let fixture = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'ui-' AND label ENDSWITH '@example.test'")).firstMatch
+                if fixture.exists {
+                    fixture.tap()
+                    app.buttons["Sign out"].tap()
+                    app.buttons["Reader options"].tap()
+                }
+            }
+            #endif
             guard app.buttons["Sign in to Logos"].exists else { throw XCTSkip("A reader is already signed in.") }
             app.buttons["Sign in to Logos"].tap()
         }
@@ -120,6 +138,24 @@ final class PilotUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Authorized King James Version"].waitForExistence(timeout: 8))
         app.terminate()
         app.launch()
+        if useInbox {
+            app.tabBars.buttons["Protection"].tap()
+            app.buttons["Accountability partner"].tap()
+            app.buttons["Add partner"].tap()
+            let partner = "partner-" + UUID().uuidString.prefix(8).lowercased() + "@example.test"
+            let field = app.textFields["Partner email or pilot username"]
+            field.tap()
+            field.typeText(partner)
+            let approval = app.switches.firstMatch
+            approval.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.5)).tap()
+            let create = app.buttons["Create invitation"]
+            if !create.isHittable { app.swipeUp() }
+            XCTAssertTrue(create.isEnabled)
+            create.tap()
+            XCTAssertTrue(app.staticTexts[partner].waitForExistence(timeout: 8))
+            app.buttons["Cancel invitation"].tap()
+            XCTAssertTrue(app.staticTexts["Outgoing · Revoked"].waitForExistence(timeout: 8))
+        }
         app.tabBars.buttons["Read"].tap()
         options.tap()
         app.buttons[email].tap()

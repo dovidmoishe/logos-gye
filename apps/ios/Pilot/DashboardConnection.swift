@@ -44,19 +44,14 @@ private enum DeviceKeychain {
     }
 }
 
-private final class DeviceTransport: NSObject, URLSessionTaskDelegate {
-    static let session = URLSession(configuration: .ephemeral, delegate: DeviceTransport(), delegateQueue: nil)
-    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        completionHandler(nil)
-    }
+private enum DeviceTransport {
     static func post(_ url: URL, body: [String:String], credential: String? = nil) async throws -> Data {
         var request = URLRequest(url: url, timeoutInterval: 12)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let credential { request.setValue("Bearer " + credential, forHTTPHeaderField: "Authorization") }
         request.httpBody = try JSONEncoder().encode(body)
-        let (data,response) = try await session.data(for: request)
+        let (data,response) = try await ReaderTransport.session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw PairingError.failed }
         if http.statusCode == 401 { throw PairingError.unauthorized }
         guard (200..<300).contains(http.statusCode) else { throw PairingError.failed }
@@ -89,7 +84,7 @@ struct DashboardConnection: View {
                     TextField("Pairing pass", text: $pass).textInputAutocapitalization(.never).autocorrectionDisabled()
                         .privacySensitive()
                     Button("Connect device") { perform { try await pair() } }.disabled(pass.isEmpty)
-                } footer: { Text("In the dashboard, open Device account and create a pairing pass. Pair only with your own dashboard.") }
+                } footer: { Text("In the dashboard, open Devices and create a pairing pass. Pair only with your own dashboard.") }
             }
             if !message.isEmpty { Text(message) }
         }
@@ -135,19 +130,82 @@ struct DashboardConnection: View {
     }
 }
 
+struct PartnerAgreement: Decodable, Identifiable {
+    static let scope = "weekly-blocked-counts-v1"
+    let id: UUID
+    let recipient: String
+    let owner: String
+    let status: String
+    let expiresAt: Double
+}
+
 struct PartnerInformation: View {
+    @EnvironmentObject private var account: ReaderAccount
+    @Environment(\.scenePhase) private var phase
     @State private var dashboard: URL?
+    @State private var rows: [PartnerAgreement] = []
+    @State private var busy = false
+    @State private var loaded = false
+    @State private var message: String?
+    @State private var recipient = ""
+    @State private var consent = false
+    @FocusState private var editingRecipient: Bool
+    @State private var signingIn = false
+    @State private var adding = false
 
     var body: some View {
         List {
-            Section("Partner agreement") {
-                Text("Invite a partner from your dashboard and choose whether to share weekly grouped counts. Check-ins and reading history stay private.")
-                if let dashboard {
-                    Link("Open dashboard", destination: dashboard)
-                } else {
-                    NavigationLink("Connect your dashboard") { DashboardConnection() }
-                }
+            Section("Partner agreements") {
+                Text("Share weekly grouped counts of blocked adult-category requests after both people agree.")
+                if let email = account.email {
+                    if !loaded && message == nil { ProgressView("Loading agreements") }
+                    if loaded && rows.isEmpty { Text("No partners yet").foregroundStyle(.secondary) }
+                    ForEach(rows) { row in
+                        let outgoing = row.owner.lowercased() == email.lowercased()
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(outgoing ? row.recipient : row.owner).font(.headline)
+                            Text((outgoing ? "Outgoing" : "Incoming") + " · " + row.status).font(.subheadline).foregroundStyle(.secondary)
+                            if row.status == "Pending" {
+                                Text("Expires " + Date(timeIntervalSince1970: row.expiresAt / 1000).formatted(date: .abbreviated, time: .omitted)).font(.caption)
+                            }
+                            if row.status == "Connected" {
+                                NavigationLink("View weekly report") { PartnerWeekView(agreement: row) }
+                            }
+                            if row.status == "Pending" && !outgoing {
+                                HStack {
+                                    Button("Accept weekly scope") { change(row, "accept") }
+                                    Button("Decline") { change(row, "decline") }
+                                }
+                            } else if row.status == "Connected" || row.status == "Pending" {
+                                Button(row.status == "Pending" ? "Cancel invitation" : "Revoke access") { change(row, "revoke") }
+                            }
+                        }.buttonStyle(.borderless).disabled(busy)
+                    }
+                    if !adding { Button("Add partner") { adding = true } }
+                    Button("Refresh agreements") { Task { await refresh() } }.disabled(busy)
+                } else { Button("Sign in to manage partners") { signingIn = true } }
+                if let message { Text(message).font(.footnote) }
             }
+            if adding && account.email != nil {
+                Section("Invite a partner") {
+                    TextField("Partner email or pilot username", text: $recipient)
+                        .textInputAutocapitalization(.never).keyboardType(.emailAddress).autocorrectionDisabled()
+                        .focused($editingRecipient).submitLabel(.done).onSubmit { editingRecipient = false }
+                        .onChange(of: recipient) { _, _ in consent = false }
+                    Toggle("I agree to share weekly grouped counts with this partner.", isOn: $consent)
+                        .onChange(of: consent) { _, approved in if approved { editingRecipient = false } }
+                    Button("Create invitation") {
+                        Task {
+                            if await update({ try await account.invitePartner(recipient) }) {
+                                adding = false; recipient = ""; consent = false
+                                message = "Invitation ready. Your partner can sign in to Logos to respond."
+                            }
+                        }
+                    }.disabled(!consent || recipient.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Cancel") { adding = false; recipient = ""; consent = false }
+                }.disabled(busy)
+            }
+            if let dashboard { Link("Open dashboard", destination: dashboard) }
             Section {
                 NavigationLink("Preview weekly report") {
                     List {
@@ -163,6 +221,81 @@ struct PartnerInformation: View {
             } footer: { Text("The pilot sends no partner reports.") }
         }
         .screenTitle("Accountability partner")
-        .onAppear { dashboard = (try? DeviceKeychain.load())?.origin.appendingPathComponent("account") }
+        .onAppear { dashboard = (try? DeviceKeychain.load())?.origin.appendingPathComponent("partners") }
+        .task(id: account.owner) {
+            rows = []; loaded = false; adding = false; consent = false; recipient = ""; message = nil
+            await refresh()
+        }
+        .onChange(of: phase) { _, value in
+            if value == .active { Task { await refresh() } }
+        }
+        .sheet(isPresented: $signingIn) { NavigationStack { ReaderSignIn { signingIn = false } } }
+    }
+
+    private func refresh() async {
+        guard account.email != nil else { return }
+        _ = await update { try await account.agreements() }
+    }
+
+    private func change(_ row: PartnerAgreement, _ action: String) {
+        Task { _ = await update { try await account.respond(to: row, action: action) } }
+    }
+
+    private func update(_ operation: () async throws -> [PartnerAgreement]) async -> Bool {
+        guard !busy else { return false }
+        busy = true; message = nil
+        defer { busy = false }
+        do {
+            rows = try await operation()
+            loaded = true
+            return true
+        } catch {
+            if !Task.isCancelled { message = error.localizedDescription }
+            return false
+        }
+    }
+}
+
+struct PartnerWeek: Decodable {
+    enum Status: String, Decodable { case available, unavailable, awaitingFirstWeek = "awaiting_first_week" }
+    let status: Status
+    let weekStart: Double
+    let weekEnd: Double
+    let groupedRequests: Int?
+}
+
+private struct PartnerWeekView: View {
+    let agreement: PartnerAgreement
+    @EnvironmentObject private var account: ReaderAccount
+    @Environment(\.scenePhase) private var phase
+    @State private var report: PartnerWeek?
+    @State private var error: String?
+
+    var body: some View {
+        List {
+            if let report {
+                let utc = Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: TimeZone(secondsFromGMT: 0)!)
+                Section("Reporting week · UTC") {
+                    Text(Date(timeIntervalSince1970: report.weekStart / 1000).formatted(utc) + " – "
+                         + Date(timeIntervalSince1970: report.weekEnd / 1000 - 1).formatted(utc))
+                    switch report.status {
+                    case .available:
+                        if let count = report.groupedRequests { LabeledContent("Grouped blocked requests", value: String(count)) }
+                    case .unavailable: Text("No report data is available for this week.")
+                    case .awaitingFirstWeek: Text("This is the first full week covered by your agreement.")
+                    }
+                }
+            } else if let error { Text(error) } else { ProgressView("Loading report") }
+        }
+        .screenTitle("Weekly report")
+        .task(id: phase) {
+            report = nil; error = nil
+            guard phase == .active else { return }
+            do {
+                let result = try await account.weeklyReport(for: agreement)
+                try Task.checkCancellation()
+                report = result
+            } catch { if !Task.isCancelled { self.error = error.localizedDescription } }
+        }
     }
 }

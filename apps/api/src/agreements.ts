@@ -11,14 +11,25 @@ import {
   Post,
   Req,
 } from "@nestjs/common";
-import { and, desc, eq, gt, inArray, lte, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Request } from "express";
 import { randomUUID } from "node:crypto";
 import { AccountService } from "./accounts";
 import { Database } from "./db/connection";
-import { accounts, agreements } from "./db/schema";
+import { accounts, agreements, weeklyReports } from "./db/schema";
 
+type Party = { id: string; username: string };
+function addressedTo(party: Party) {
+  return or(
+    eq(agreements.recipient, party.id),
+    and(
+      isNull(agreements.recipient),
+      eq(agreements.status, "Pending"),
+      eq(agreements.inviteAddress, party.username),
+    ),
+  );
+}
 const scope = "weekly-blocked-counts-v1";
 @Injectable()
 export class Agreements {
@@ -26,19 +37,19 @@ export class Agreements {
   private get db() {
     return this.database.db;
   }
-  private async expire(user: string) {
+  private async expire(user: Party) {
     await this.db
       .update(agreements)
       .set({ status: "Expired" })
       .where(
         and(
-          or(eq(agreements.owner, user), eq(agreements.recipient, user)),
+          or(eq(agreements.owner, user.id), addressedTo(user)),
           eq(agreements.status, "Pending"),
           lte(agreements.expiresAt, Date.now()),
         ),
       );
   }
-  async list(user: string) {
+  async list(user: Party) {
     await this.expire(user);
     const owner = alias(accounts, "sender"),
       recipient = alias(accounts, "receiver");
@@ -46,28 +57,33 @@ export class Agreements {
       .select({
         id: agreements.id,
         owner: owner.username,
-        recipient: recipient.username,
+        recipient: sql<string>`coalesce(${recipient.username}, ${agreements.inviteAddress})`,
+        createdAt: agreements.createdAt,
         status: agreements.status,
         scope: agreements.scope,
         expiresAt: agreements.expiresAt,
       })
       .from(agreements)
       .innerJoin(owner, eq(owner.id, agreements.owner))
-      .innerJoin(recipient, eq(recipient.id, agreements.recipient))
-      .where(or(eq(agreements.owner, user), eq(agreements.recipient, user)))
+      .leftJoin(recipient, eq(recipient.id, agreements.recipient))
+      .where(or(eq(agreements.owner, user.id), addressedTo(user)))
       .orderBy(desc(agreements.createdAt));
   }
-  async invite(user: string, username: unknown, acceptedScope: unknown) {
+  async invite(user: Party, username: unknown, acceptedScope: unknown) {
     if (acceptedScope !== scope || typeof username !== "string")
       throw new BadRequestException(
         "Confirm the weekly report scope and enter a partner username.",
       );
+    const address = username.trim().toLowerCase();
+    if (!address || address.length > 254)
+      throw new BadRequestException("Enter a partner email or pilot username.");
     const [recipient] = await this.db
       .select({ id: accounts.id })
       .from(accounts)
-      .where(eq(accounts.username, username.trim().toLowerCase()));
-    if (!recipient) throw new NotFoundException("Partner account unavailable.");
-    if (recipient.id === user)
+      .where(eq(accounts.username, address));
+    if (!recipient && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))
+      throw new NotFoundException("Partner account unavailable.");
+    if (recipient?.id === user.id)
       throw new BadRequestException("Choose another account.");
     await this.expire(user);
     const now = Date.now();
@@ -75,8 +91,9 @@ export class Agreements {
       .insert(agreements)
       .values({
         id: randomUUID(),
-        owner: user,
-        recipient: recipient.id,
+        owner: user.id,
+        recipient: recipient?.id ?? null,
+        inviteAddress: address,
         status: "Pending",
         scope,
         createdAt: now,
@@ -90,8 +107,56 @@ export class Agreements {
       );
     return this.list(user);
   }
+  async weeklyReport(user: Party, id: string) {
+    const day = 86400000;
+    const week = day * 7;
+    // Monday 00:00 UTC. Only a completed week entirely inside this agreement is eligible.
+    const currentMonday =
+      Math.floor((Date.now() - 4 * day) / week) * week + 4 * day;
+    const weekStart = currentMonday - week;
+    const [row] = await this.db
+      .select({
+        acceptedAt: agreements.acceptedAt,
+        count: weeklyReports.groupedRequests,
+      })
+      .from(agreements)
+      .leftJoin(
+        weeklyReports,
+        and(
+          eq(agreements.id, weeklyReports.agreementId),
+          eq(weeklyReports.weekStart, weekStart),
+          lte(agreements.acceptedAt, weekStart),
+        ),
+      )
+      .where(
+        and(
+          eq(agreements.id, id),
+          eq(agreements.scope, scope),
+          eq(agreements.status, "Connected"),
+          or(eq(agreements.owner, user.id), eq(agreements.recipient, user.id)),
+        ),
+      );
+    if (!row) throw new NotFoundException("Weekly report unavailable.");
+    if (row.acceptedAt == null || row.acceptedAt > weekStart) {
+      const firstWeek =
+        Math.ceil(((row.acceptedAt ?? Date.now()) - 4 * day) / week) * week +
+        4 * day;
+      return {
+        status: "awaiting_first_week",
+        weekStart: firstWeek,
+        weekEnd: firstWeek + week,
+        groupedRequests: null,
+      };
+    }
+    return {
+      status: row.count == null ? "unavailable" : "available",
+      weekStart,
+      weekEnd: currentMonday,
+      groupedRequests: row.count,
+    };
+  }
   async respond(
-    user: string,
+    user: Party,
     id: string,
     action: unknown,
     acceptedScope: unknown,
@@ -104,13 +169,13 @@ export class Agreements {
     const permitted =
       action === "revoke"
         ? or(
-            eq(agreements.owner, user),
+            eq(agreements.owner, user.id),
             and(
-              eq(agreements.recipient, user),
+              eq(agreements.recipient, user.id),
               eq(agreements.status, "Connected"),
             ),
           )
-        : eq(agreements.recipient, user);
+        : addressedTo(user);
     const eligible =
       action === "revoke"
         ? inArray(agreements.status, ["Pending", "Connected"])
@@ -121,6 +186,8 @@ export class Agreements {
     const changed = await this.db
       .update(agreements)
       .set({
+        ...(action === "revoke" ? {} : { recipient: user.id }),
+        ...(action === "accept" ? { acceptedAt: Date.now() } : {}),
         status:
           action === "accept"
             ? "Connected"
@@ -149,9 +216,13 @@ export class AgreementsController {
     private readonly agreements: Agreements,
   ) {}
   @Get() async list(@Req() req: Request) {
-    return this.agreements.list(
-      (await this.accounts.owner(req)).id,
-    );
+    return this.agreements.list(await this.accounts.owner(req));
+  }
+  @Get(":id/report") async report(
+    @Req() req: Request,
+    @Param("id") id: string,
+  ) {
+    return this.agreements.weeklyReport(await this.accounts.owner(req), id);
   }
   @Post() async invite(
     @Req() req: Request,
@@ -159,7 +230,7 @@ export class AgreementsController {
     @Body("scope") scope: unknown,
   ) {
     return this.agreements.invite(
-      (await this.accounts.owner(req)).id,
+      await this.accounts.owner(req),
       username,
       scope,
     );
@@ -171,7 +242,7 @@ export class AgreementsController {
     @Body("scope") scope: unknown,
   ) {
     return this.agreements.respond(
-      (await this.accounts.owner(req)).id,
+      await this.accounts.owner(req),
       id,
       action,
       scope,

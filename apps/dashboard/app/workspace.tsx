@@ -7,7 +7,7 @@ import {
   CalendarDays,
   ChevronRight,
   Fingerprint,
-  Layers3,
+
   LayoutGrid,
   LockKeyhole,
   Plus,
@@ -20,10 +20,10 @@ import {
 import { useWorkspace, type Partner } from "../lib/workspace";
 
 const nav = [
-  { key: "overview", name: "Overview", href: "/", icon: LayoutGrid },
-  { key: "devices", name: "Devices", href: "/devices", icon: Smartphone },
-  { key: "partners", name: "Partners", href: "/partners", icon: Users },
-  { key: "privacy", name: "Privacy", href: "/privacy", icon: Fingerprint },
+  { key: "overview", name: "Overview", href: "/demo", icon: LayoutGrid },
+  { key: "devices", name: "Devices", href: "/demo/devices", icon: Smartphone },
+  { key: "partners", name: "Partners", href: "/demo/partners", icon: Users },
+  { key: "privacy", name: "Privacy", href: "/demo/privacy", icon: Fingerprint },
 ] as const;
 type Section = (typeof nav)[number]["key"];
 const headings = {
@@ -108,9 +108,9 @@ export default function Dashboard({ section }: { section: Section }) {
   return (
     <div className="shell">
       <aside>
-        <Link href="/" className="brand">
+        <Link href="/demo" className="brand">
           <span>
-            <Layers3 size={21} />
+            <img src="/brand/logos.png" alt="" width="33" height="33" />
           </span>
           Logos
         </Link>
@@ -139,7 +139,7 @@ export default function Dashboard({ section }: { section: Section }) {
             Workspace <ChevronRight size={13} />
             <b>{current.name}</b>
           </div>
-          <Link className="textlink" href="/account">Device account →</Link>
+          <Link className="textlink" href="/account">My workspace →</Link>
           <span className="chip">
             <i /> Demo workspace
           </span>
@@ -163,7 +163,7 @@ export default function Dashboard({ section }: { section: Section }) {
           {!modal && error}
           {section === "overview" && (
             <div className="overview-metrics">
-              <Link href="/devices" className="metric protection">
+              <Link href="/demo/devices" className="metric protection">
                 <span className="metric-label">
                   <ShieldCheck />
                   Device protection
@@ -173,7 +173,7 @@ export default function Dashboard({ section }: { section: Section }) {
                   iPhone 13 · Sample device <ArrowRight />
                 </span>
               </Link>
-              <Link href="/partners" className="metric">
+              <Link href="/demo/partners" className="metric">
                 <span className="metric-label">
                   <Users />
                   Accountability
@@ -183,7 +183,7 @@ export default function Dashboard({ section }: { section: Section }) {
                   Connected partners <ArrowRight />
                 </span>
               </Link>
-              <Link href="/privacy" className="metric">
+              <Link href="/demo/privacy" className="metric">
                 <span className="metric-label">
                   <CalendarDays />
                   Report schedule
@@ -207,7 +207,7 @@ export default function Dashboard({ section }: { section: Section }) {
                       : "Invitations & connections"}
                   </h2>
                   {section === "overview" && (
-                    <Link href="/partners" className="textlink">
+                    <Link href="/demo/partners" className="textlink">
                       View all <ArrowRight size={14} />
                     </Link>
                   )}
@@ -253,7 +253,7 @@ export default function Dashboard({ section }: { section: Section }) {
                 <LockKeyhole className="accent" />
                 <h2>Partner report scope</h2>
                 <p>{scope}</p>
-                <Link className="textlink" href="/partners">
+                <Link className="textlink" href="/demo/partners">
                   Review agreements <ArrowDownRight size={16} />
                 </Link>
               </section>

@@ -81,7 +81,10 @@ private enum SessionKeychain {
     }
 }
 
-private final class ReaderTransport: NSObject, URLSessionTaskDelegate {
+final class ReaderTransport: NSObject, URLSessionTaskDelegate {
+    #if DEBUG
+    private static let pairingOrigin = (Bundle.main.object(forInfoDictionaryKey: "LocalPairingOrigin") as? String).flatMap(URL.init(string:))
+    #endif
     static let session = URLSession(configuration: .ephemeral, delegate: ReaderTransport(), delegateQueue: nil)
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
@@ -89,7 +92,10 @@ private final class ReaderTransport: NSObject, URLSessionTaskDelegate {
                     completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         #if DEBUG
         if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-           let host = ReaderAccount.apiOrigin?.host, challenge.protectionSpace.host.caseInsensitiveCompare(host) == .orderedSame,
+           [ReaderAccount.apiOrigin, Self.pairingOrigin].compactMap({ $0 }).contains(where: {
+               $0.scheme == "https" && $0.host?.lowercased() == challenge.protectionSpace.host.lowercased()
+                   && ($0.port ?? 443) == challenge.protectionSpace.port
+           }),
            let pin = Bundle.main.object(forInfoDictionaryKey: "ReaderDevelopmentCertificateHash") as? String, !pin.isEmpty,
            let trust = challenge.protectionSpace.serverTrust,
            let cert = (SecTrustCopyCertificateChain(trust) as? [SecCertificate])?.first {
@@ -236,14 +242,34 @@ private final class ReaderTransport: NSObject, URLSessionTaskDelegate {
         return try await task.value.access_token
     }
     func request<T: Decodable>(_ path: String, body: [String: Any]? = nil, personal: Bool = true) async throws -> T {
-        guard let base = Self.apiOrigin, let url = URL(string: "/api/reading/" + path, relativeTo: base)?.absoluteURL else {
+        try await apiRequest("reading/" + path, method: body == nil ? "GET" : "POST", body: body, personal: personal)
+    }
+
+    func agreements() async throws -> [PartnerAgreement] {
+        try await apiRequest("account/agreements", method: "GET", body: nil, personal: true)
+    }
+
+    func weeklyReport(for agreement: PartnerAgreement) async throws -> PartnerWeek {
+        try await apiRequest("account/agreements/" + agreement.id.uuidString.lowercased() + "/report", method: "GET", body: nil, personal: true)
+    }
+
+    func invitePartner(_ recipient: String) async throws -> [PartnerAgreement] {
+        try await apiRequest("account/agreements", method: "POST", body: ["username": recipient, "scope": PartnerAgreement.scope], personal: true)
+    }
+
+    func respond(to agreement: PartnerAgreement, action: String) async throws -> [PartnerAgreement] {
+        try await apiRequest("account/agreements/" + agreement.id.uuidString.lowercased(), method: "PATCH", body: ["action": action, "scope": PartnerAgreement.scope], personal: true)
+    }
+
+    private func apiRequest<T: Decodable>(_ path: String, method: String, body: [String: Any]?, personal: Bool) async throws -> T {
+        guard let base = Self.apiOrigin, let url = URL(string: "/api/" + path, relativeTo: base)?.absoluteURL else {
             throw ReaderError(message: "Configure the reading API address for this build.")
         }
         let initialOwner = owner
         var req = URLRequest(url: url, timeoutInterval: 18)
         if personal { req.setValue("Bearer " + (try await accessToken()), forHTTPHeaderField: "Authorization") }
+        req.httpMethod = method
         if let body {
-            req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }

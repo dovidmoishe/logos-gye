@@ -29,6 +29,20 @@
       "when": 1795815369968,
       "tag": "0003_scripture_reader",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795823933476,
+      "tag": "0004_partner_invitation_address",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795824242909,
+      "tag": "0005_weekly_partner_reports",
+      "breakpoints": true
     }
   ]
 }

@@ -58,9 +58,20 @@ services:
       DATABASE_URL: postgres://logos:${DB_PASSWORD}@db:5432/logos
       SUPABASE_URL: http://gateway:8080
       SUPABASE_JWT_ISSUER: ${PHONE_ORIGIN}/auth/v1
+  web:
+    build:
+      context: ../../..
+      dockerfile: infra/Dockerfile
+      target: dashboard
+      args:
+        LOGOS_LOCAL_EMAIL_TEST: "true"
+        NEXT_PUBLIC_PAIRING_ORIGIN: ${PHONE_ORIGIN}
   gateway:
     image: nginx:stable-alpine
     depends_on:
+      web:
+        condition: service_started
+        restart: true
       api:
         condition: service_started
         restart: true

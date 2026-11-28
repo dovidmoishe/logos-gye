@@ -13,6 +13,9 @@ USER node
 CMD ["npm","start","-w","@logos/api"]
 
 FROM base AS dashboard
+ARG LOGOS_LOCAL_EMAIL_TEST=false
+ARG NEXT_PUBLIC_PAIRING_ORIGIN
+ENV LOGOS_LOCAL_EMAIL_TEST=$LOGOS_LOCAL_EMAIL_TEST
 COPY apps/dashboard apps/dashboard
 ENV API_ORIGIN=http://api:3001 NEXT_TELEMETRY_DISABLED=1
 RUN npm run build -w @logos/dashboard

@@ -46,6 +46,7 @@ compose exec -T -w /workspace/apps/api api sh -ec 'node dist/reading/jobs/seed-b
 pin="$(openssl x509 -in "$directory/tls/cert.pem" -outform der | shasum -a 256 | cut -d' ' -f1)"
 cat > "$directory/Debug.xcconfig" <<CONFIG
 LOGOS_LOCAL_EMAIL_TEST = YES
+LOGOS_LOCAL_PAIRING_ORIGIN = https:/\$()/$name:54443
 LOGOS_READER_API = https:/\$()/$name:54443
 LOGOS_READER_API[sdk=iphonesimulator*] = http:/\$()/127.0.0.1:54321
 LOGOS_SIMULATOR_AUTH_ORIGIN[sdk=iphonesimulator*] = http:/\$()/127.0.0.1:54321

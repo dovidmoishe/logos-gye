@@ -26,11 +26,11 @@ test("verified Logos identities own their ranked feeds, topics, bookmarks and da
   await app.listen(0, "127.0.0.1");
   const base = await app.getUrl();
   const db = app.get(Database).pool;
-  const alice = randomUUID(), bob = randomUUID(), translation = randomUUID(), topic = randomUUID(), book = randomUUID();
+  const alice = randomUUID(), bob = randomUUID(), outsider = randomUUID(), translation = randomUUID(), topic = randomUUID(), book = randomUUID();
   t.after(async () => {
     try {
-      await db.query("delete from accounts where id=any($1::text[])", [[alice, bob].map(id => "supabase:" + id)]);
-      await db.query("delete from users where id=any($1::uuid[])", [[alice,bob]]);
+      await db.query("delete from accounts where id=any($1::text[])", [[alice, bob, outsider].map(id => "supabase:" + id)]);
+      await db.query("delete from users where id=any($1::uuid[])", [[alice,bob,outsider]]);
       await db.query("delete from bible_translations where id=$1", [translation]);
       await db.query("delete from bible_books where id=$1", [book]);
       await db.query("delete from topics where id=$1", [topic]);
@@ -51,6 +51,32 @@ test("verified Logos identities own their ranked feeds, topics, bookmarks and da
     body:body&&JSON.stringify(body)});
   assert.equal((await call("reading/feed")).status,401);
   assert.equal((await call("reading/feed",await sign(alice,"other"))).status,401);
+  // Invite a recipient before their first authenticated API call creates their account.
+  const scope = "weekly-blocked-counts-v1";
+  const invite = await call("account/agreements", tokens[0], { username: bob.toUpperCase()+"@EXAMPLE.INVALID", scope });
+  assert.equal(invite.status, 201);
+  const [pending] = await invite.json();
+  const path = "account/agreements/" + pending.id;
+  const patch = (token, action) => fetch(base+"/api/"+path, { method:"PATCH",
+    headers: { "content-type":"application/json", authorization:"Bearer "+token }, body: JSON.stringify({action, scope}) });
+  assert.equal((await call(path+"/report", tokens[0])).status, 404);
+  assert.equal((await patch(tokens[0], "accept")).status,404);
+  assert.equal((await (await call("account/agreements",tokens[1])).json())[0].id,pending.id);
+  const unrelated = await sign(outsider);
+  assert.deepEqual(await (await call("account/agreements",unrelated)).json(),[]);
+  assert.equal((await patch(unrelated, "accept")).status,404);
+  assert.equal((await patch(tokens[1], "accept")).status,200);
+  assert.equal((await call(path+"/report",unrelated)).status,404);
+  assert.equal((await (await call(path+"/report",tokens[1])).json()).status, "awaiting_first_week");
+  await db.query("update account_agreements set accepted_at=0 where id=$1",[pending.id]);
+  const missing = await (await call(path+"/report",tokens[0])).json();
+  assert.equal(missing.status,"unavailable");
+  assert.equal(missing.groupedRequests,null);
+  await db.query("insert into agreement_weekly_reports (agreement_id,week_start,grouped_requests) values($1,$2,0)",[pending.id,missing.weekStart]);
+  const report = await (await call(path+"/report",tokens[1])).json();
+  assert.deepEqual(report,{...missing,status:"available",groupedRequests:0});
+  assert.equal((await patch(tokens[0], "revoke")).status,200);
+  assert.equal((await call(path+"/report",tokens[1])).status,404);
   const chapter=await (await call("reading/verses/"+verses[2]+"/chapter")).json();
   assert.deepEqual(chapter.verses.map(v=>v.verse),[1,2,3,4]);
   const selected = await call("reading/onboarding/topics", tokens[0], {topicIds: [topic.toUpperCase(), topic]});

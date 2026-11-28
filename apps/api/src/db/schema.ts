@@ -2,6 +2,9 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   index,
+  integer,
+  primaryKey,
+  check,
   pgEnum,
   pgTable,
   serial,
@@ -75,11 +78,13 @@ export const agreements = pgTable(
     owner: text("owner")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
-    recipient: text("recipient")
-      .notNull()
-      .references(() => accounts.id, { onDelete: "cascade" }),
+    inviteAddress: text("invite_address").notNull(),
+    recipient: text("recipient").references(() => accounts.id, {
+      onDelete: "cascade",
+    }),
     status: partnerStatus("status").notNull(),
     scope: text("scope").notNull(),
+    acceptedAt: bigint("accepted_at", { mode: "number" }),
     createdAt: bigint("created_at", { mode: "number" }).notNull(),
     expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
   },
@@ -87,6 +92,24 @@ export const agreements = pgTable(
     uniqueIndex("agreements_active_pair")
       .on(a.owner, a.recipient)
       .where(sql`${a.status} in ('Pending','Connected')`),
+    uniqueIndex("agreements_active_address")
+      .on(a.owner, a.inviteAddress)
+      .where(sql`${a.status} in ('Pending','Connected')`),
     index("agreements_recipient_idx").on(a.recipient),
+  ],
+);
+
+export const weeklyReports = pgTable(
+  "agreement_weekly_reports",
+  {
+    agreementId: text("agreement_id")
+      .notNull()
+      .references(() => agreements.id, { onDelete: "cascade" }),
+    weekStart: bigint("week_start", { mode: "number" }).notNull(),
+    groupedRequests: integer("grouped_requests").notNull(),
+  },
+  (r) => [
+    primaryKey({ columns: [r.agreementId, r.weekStart] }),
+    check("nonnegative_grouped_requests", sql`${r.groupedRequests} >= 0`),
   ],
 );

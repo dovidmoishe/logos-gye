@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
+<key>LocalPairingOrigin</key><string>$(LOGOS_LOCAL_PAIRING_ORIGIN)</string>
 <key>LocalEmailTest</key><string>$(LOGOS_LOCAL_EMAIL_TEST)</string>
 <key>SimulatorAuthOrigin</key><string>$(LOGOS_SIMULATOR_AUTH_ORIGIN)</string>
 <key>ReaderAPIOrigin</key><string>$(LOGOS_READER_API)</string>

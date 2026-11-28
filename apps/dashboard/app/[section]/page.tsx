@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Dashboard from "../workspace";
+import { AccountWorkspace } from "../account/workspace";
 export default async function Page({
   params,
 }: {
@@ -8,5 +8,5 @@ export default async function Page({
   const { section } = await params;
   if (section !== "partners" && section !== "devices" && section !== "privacy")
     notFound();
-  return <Dashboard section={section} />;
+  return <AccountWorkspace section={section} />;
 }

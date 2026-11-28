@@ -12,7 +12,7 @@ Open **Read** for live Scripture. If you previously chose the offline sample, ta
 
 For a physical Debug build, run `infra/dev-reader-mac.sh` from the repository root, then build the Logos scheme. This starts Nest on port 3443, creates a local development certificate and writes the Mac hostname and certificate fingerprint into the Debug configuration. Keep the Mac and phone on the same Wi-Fi and allow local network access when prompted. For a release build, set LOGOS_READER_API to the deployed HTTPS API origin. A simulator can use a local API on port 3001.
 
-**Protection** shows the DNS configuration and timestamped safe-check result. The setup screen explains the resolver before requesting approval. Results stay local unless the owner pairs their device and selects **Run and share safe check** under **Dashboard connection**. **Accountability partner** opens the sample weekly report and, on a paired device, links to the dashboard for agreement management.
+**Protection** shows the DNS configuration and timestamped safe-check result. The setup screen explains the resolver before requesting approval. Results stay local unless the owner pairs their device and selects **Run and share safe check** under **Dashboard connection**. **Accountability partner** lets a signed-in reader invite someone, review the scope, respond to invitations, open a connected agreement’s weekly report, or revoke access. Guests can preview the report.
 
 Urbanist SemiBold is bundled under the SIL Open Font License. On the first build per DerivedData configuration, Xcode downloads unmodified Satoshi Regular from Fontshare for app embedding, then caches it. Both license texts ship with the app.
 

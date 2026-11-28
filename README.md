@@ -18,7 +18,7 @@ Alternatively, run `docker compose -f infra/compose.yaml up --build`. The dashbo
 
 ## Demo boundaries
 
-Use fictional addresses. The API persists invitations in a browser-specific workspace identified by an HTTP-only cookie. Recipient decisions are simulated and no email is sent. Device information and report counts are fixtures. The iPhone app continues to verify real DNS behavior locally. Signed-in device accounts use the separate /account view. Recipient authentication, domain-event reporting and delivery are separate work.
+Open `/demo` to explore the sample workspace with fictional addresses. Its API persists invitations in a browser-specific workspace identified by an HTTP-only cookie. Recipient decisions are simulated and no email is sent. Device information and report counts are fixtures. The iPhone app continues to verify real DNS behavior locally. The main dashboard uses authenticated accounts and recipient decisions. Open **Partners** for live invitations and **Devices** for pairing.
 
 ## Database
 
@@ -46,9 +46,11 @@ For a fresh development database without a dump, run `npm run seed:scripture -w 
 | POST /interactions | Record reading actions with a per-request ID for retry handling |
 | GET and PATCH /users/me | Read and edit the signed-in reader’s profile |
 
+When the Mac email-test stack is running, open [the local dashboard](http://127.0.0.1:54321/partners) and [Mailpit](http://127.0.0.1:54324). This dashboard uses the same local account and database as the Debug iPhone app. Run `infra/supabase/local/start.sh` to start or update the stack.
+
 ## Account and iPhone pilot
 
-Open **Device account** in the dashboard (route `/account`). Sign in with the code sent to your Logos email, name an iPhone, then create a pairing pass. In the app, open **Protection → Dashboard connection**, paste the pass, and connect. **Run and share safe check** sends the latest synthetic DNS check outcome. Refresh the dashboard to see the result and server receipt time. Disconnect removes the device and invalidates its credential.
+Open **Devices** in the dashboard (`/devices` or `/account`). Sign in with the code sent to your Logos email, name an iPhone, then create a pairing pass. In the app, open **Protection → Dashboard connection**, paste the pass, and connect. **Run and share safe check** sends the latest synthetic DNS check outcome. Refresh the dashboard to see the result and server receipt time. Disconnect removes the device and invalidates its credential.
 
 The local simulator can reach the dashboard at http://127.0.0.1:3000. A physical phone needs a trusted HTTPS dashboard origin reachable from the phone, with /api proxied to the same API. The default development server is loopback-only. Set COOKIE_SECURE=true when serving through HTTPS. Automatic migrations add the account and device tables. The separate partner demo continues to use its original browser cookie.
 
@@ -57,9 +59,10 @@ The local simulator can reach the dashboard at http://127.0.0.1:3000. A physical
 | POST /api/account/register, POST /api/account/login | Create an account or authenticate with username and password. Establish a 30-day HTTP-only session. |
 | GET /api/account, DELETE /api/account/session | List the signed-in owner's devices or invalidate the current session. |
 | POST /api/account/devices, DELETE /api/account/devices/:id | Issue a 10-minute, single-use pairing pass or revoke a device. |
-| GET, POST /api/account/agreements | List agreements or invite an existing account under the weekly grouped-count scope. |
+| GET, POST /api/account/agreements | List agreements or invite a partner email or an existing pilot username under the weekly grouped-count scope. |
 | PATCH /api/account/agreements/:id | Accept or decline as recipient, or revoke as a party to the agreement. |
+| GET /api/account/agreements/:id/report | Read the most recent completed UTC week under a connected agreement. |
 | POST /api/device/pair | Exchange a pass for a device credential. iOS stores it in Keychain. |
 | POST /api/device/checks | Use the device bearer credential to replace its latest check with blocked, open or unknown. |
 
-Only credential digests are persisted on the server. The device endpoint accepts synthetic check outcomes independently of partner reporting. No general browsing activity is uploaded. Partners sign in to review invitations in the dashboard. Legacy pilot password recovery UI, real activity ingestion, consent-scoped report generation and digest delivery are still pending.
+Only credential digests are persisted on the server. The device endpoint accepts synthetic check outcomes independently of partner reporting. No general browsing activity is uploaded. Partners sign in to review invitations in the dashboard. Invitations appear when the recipient signs in with the invited address. Connected parties can open the weekly report on the dashboard or iPhone. The first eligible week begins on or after acceptance. Missing telemetry is shown as unavailable. Automatic DNS aggregation, outbound invitation emails and digest delivery remain pending.
